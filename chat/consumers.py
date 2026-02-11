@@ -1,0 +1,125 @@
+import json
+from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
+from django.utils import timezone
+from urllib.parse import unquote
+
+class ChatConsumer(AsyncWebsocketConsumer):
+    """
+    Consumer for Course Group Chat
+    """
+    async def connect(self):
+        self.course_id = self.scope['url_route']['kwargs']['course_id']
+        self.room_group_name = f'chat_{self.course_id}'
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        text_data_json = json.loads(text_data)
+        message = text_data_json.get('message', '')
+        file_url = text_data_json.get('file_url', None) 
+        user = self.scope['user']
+
+        if user.is_authenticated:
+            await self.save_message(user, self.course_id, message, file_url)
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat_message',
+                    'message': message,
+                    'file_url': file_url,
+                    'user': user.username,
+                    'timestamp': timezone.now().strftime('%H:%M')
+                }
+            )
+
+    async def chat_message(self, event):
+        await self.send(text_data=json.dumps({
+            'message': event['message'],
+            'file_url': event.get('file_url'),
+            'user': event['user'],
+            'timestamp': event['timestamp']
+        }))
+
+    @database_sync_to_async
+    def save_message(self, user, course_id, message, file_url):
+        from courses.models import Course
+        from chat.models import Message
+        course = Course.objects.get(id=course_id)
+        # Note: Ensure Message model has 'image' or 'file' field depending on your previous setup
+        # For group chat, assuming it uses 'image' field for now as per your models.py
+        msg = Message(sender=user, course=course, content=message)
+        if file_url:
+            # If your Message model uses 'image', keep using image.name
+            decoded_url = unquote(file_url)
+            msg.file.name = decoded_url.replace('/media/', '')
+        msg.save()
+        return msg
+
+
+class PrivateChatConsumer(AsyncWebsocketConsumer):
+    """
+    Consumer for 1-on-1 Private Chat
+    """
+    async def connect(self):
+        self.room_name = self.scope['url_route']['kwargs']['room_name']
+        self.room_group_name = f'chat_{self.room_name}'
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        message = data.get('message', '')
+        
+        # Unified to 'file_url' to support PDF/Audio/Image
+        file_url = data.get('file_url', None)
+        
+        sender = self.scope['user']
+        target_user_id = data.get('target_user_id')
+
+        if sender.is_authenticated and target_user_id:
+            # 1. Save to DB
+            await self.save_private_message(sender, target_user_id, message, file_url)
+
+            # 2. Broadcast
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat_message',
+                    'message': message,
+                    'file_url': file_url, 
+                    'user': sender.username,
+                    'timestamp': timezone.now().strftime('%H:%M')
+                }
+            )
+
+    async def chat_message(self, event):
+        await self.send(text_data=json.dumps({
+            'message': event['message'],
+            'file_url': event.get('file_url'),
+            'user': event['user'],
+            'timestamp': event['timestamp']
+        }))
+
+    @database_sync_to_async
+    def save_private_message(self, sender, target_id, message, file_url):
+        from django.contrib.auth import get_user_model
+        from chat.models import PrivateMessage
+        
+        User = get_user_model()
+        target = User.objects.get(id=target_id)
+        
+        msg = PrivateMessage(sender=sender, recipient=target, content=message)
+        
+        if file_url:
+            # 🔥 IMPORTANT: Use 'file' field for PrivateMessage (supports PDF/Audio)
+            decoded_url = unquote(file_url)
+            msg.file.name = decoded_url.replace('/media/', '')
+            
+        msg.save()

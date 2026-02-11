@@ -11,10 +11,17 @@ from .models import CustomUser, ProfileStatus, Notification
 
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
-    list_display = UserAdmin.list_display + ('is_student', 'is_teacher')
-    list_filter = UserAdmin.list_filter + ('is_student', 'is_teacher')
+    list_display = ['id', 'username', 'email', 'is_student', 'is_teacher', 'is_staff']
+    
+    # 可选：让 ID 也可以点击进入编辑页面
+    list_display_links = ['id', 'username']
+    
+    # 保持原有的字段设置（因为我们继承了 UserAdmin，要保留它的 fieldsets）
     fieldsets = UserAdmin.fieldsets + (
-        ('Profile Info', {'fields': ('is_student', 'is_teacher', 'bio', 'photo')}),
+        ('Custom Fields', {'fields': ('is_student', 'is_teacher', 'bio', 'photo')}),
+    )
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        (None, {'fields': ('is_student', 'is_teacher', 'bio', 'photo')}),
     )
 
 @admin.register(ProfileStatus)
