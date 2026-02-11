@@ -1,0 +1,32 @@
+# --- Python 编译文件 (垃圾文件) ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- 数据库 (本地数据) ---
+db.sqlite3
+db.sqlite3-journal
+
+# --- 媒体文件 (用户上传的内容) ---
+# 我们忽略 media 文件夹下的所有内容
+media/
+templates/
+
+# --- 环境变量 (敏感信息) ---
+.env
+.venv
+env/
+venv/
+ENV/
+
+# --- 操作系统生成的垃圾文件 ---
+.DS_Store
+Thumbs.db
+
+# --- 编辑器配置 (可选，视团队习惯而定) ---
+.vscode/
+.idea/
+
+# --- 其他 ---
+# 如果 note.txt 是你的私人笔记，也可以忽略
+note.txt
