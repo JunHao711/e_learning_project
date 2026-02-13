@@ -2,6 +2,13 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
+class AdminRequiredMixin(UserPassesTestMixin):
+    '''
+    Mixin to ensure the user is logged in and is a admin
+    '''
+    def test_func(self):
+        return self.request.user.is_authenticated and self.request.user.is_admin
+
 class TeacherRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     '''
     Mixin to ensure the user is logged in and is a teacher

@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from .models import Notification
 from .serializers import NotificationSerializer
-
+from .api_permissions import IsSiteAdminAPI
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     user only can view their notif
@@ -33,3 +33,4 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         notification.is_read = True
         notification.save()
         return Response({'status': 'marked as read'})
+

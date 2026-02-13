@@ -12,6 +12,7 @@ class CustomUser(AbstractUser):
     email = models.EmailField(unique=True, blank=False)
     is_student = models.BooleanField(default=False)
     is_teacher = models.BooleanField(default=False)
+    is_admin = models.BooleanField(default=False)
     bio = models.TextField(blank=True, null=True)
     photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
 
