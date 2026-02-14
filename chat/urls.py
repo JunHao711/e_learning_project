@@ -4,8 +4,12 @@ from . import views
 app_name = 'chat'
 
 urlpatterns = [
-    path('room/<int:course_id>/', views.course_chat_room, name='course_chat_room'),
-    path('upload/image/', views.chat_file_upload, name='chat_image_upload'),
-    path('private/<int:target_user_id>/', views.private_chat_room, name='private_chat_room'),
-    path('api/conversations/', views.get_recent_conversations, name='api_conversations'),
+    # course room history
+    path('room/<int:course_id>/history/', views.CourseChatHistoryAPIView.as_view(), name='api_course_chat_history'),
+    # private chat room and name
+    path('private/<int:target_user_id>/history/', views.PrivateChatHistoryAPIView.as_view(), name='api_private_chat_history'),
+    # file or image upload
+    path('upload/', views.ChatFileUploadAPIView.as_view(), name='api_chat_file_upload'),
+    # recent conversation
+    path('conversations/', views.RecentConversationsAPIView.as_view(), name='api_recent_conversations'),
 ]

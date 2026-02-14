@@ -11,5 +11,5 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        # Instance must have an attribute named `owner`.
+        # Write permissions are only allowed to the owner of the object.
         return obj.owner == request.user

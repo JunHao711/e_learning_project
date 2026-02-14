@@ -16,35 +16,33 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from courses.views import CourseListView
 from django.conf import settings
 from django.conf.urls.static import static
-from rest_framework.routers import DefaultRouter
-from courses import api_views
-from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-from users.api_views import NotificationViewSet
-
-router = DefaultRouter()
-router.register(r'subjects', api_views.SubjectViewSet)
-router.register(r'courses', api_views.CourseViewSet)
-router.register(r'notifications', NotificationViewSet, basename='notification')
-
+# OpenAPI Documentation Views
+from drf_spectacular.views import (
+    SpectacularAPIView, 
+    SpectacularRedocView, 
+    SpectacularSwaggerView
+)
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 urlpatterns = [
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
     path('admin/', admin.site.urls),
-    path('accounts/',include('django.contrib.auth.urls')), # contain login/logout
-    path('accounts/',include('users.urls')),
-    path('course/', include('courses.urls')),
-    path('student/', include('students.urls')),
-    path('chat/', include('chat.urls')),
-    path('', CourseListView.as_view(), name='course_list'),
-    path('subject/<slug:subject>/', CourseListView.as_view(), name='course_list_subject'),
+    path('api-auth/', include('rest_framework.urls', namespace='rest_framework')), 
 
-    path('api/', include(router.urls)),
+    path('api/users/', include('users.urls')),
+    path('api/courses/', include('courses.urls')),
+    path('api/students/', include('students.urls')),
+    path('api/chat/', include('chat.urls')),
 
+    # Swagger documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
+# for media files
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,166 +1,131 @@
-from django.shortcuts import render, redirect
-from django.views.generic.edit import FormView
-from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic.list import ListView
-from django.views.generic.detail import DetailView
-from django.views.generic.edit import UpdateView
-from .forms import CourseEnrollForm
-from courses.models import Course, Content, CourseReview
-from django.urls import reverse_lazy
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
 from django.shortcuts import get_object_or_404
+from rest_framework import generics, status, permissions
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
+from courses.models import Course, Content, CourseReview
 from .models import UserContentProgress
-from django.core.exceptions import PermissionDenied
-from courses.forms import CourseReviewForm
+from .serializers import StudentCourseListSerializer, StudentCourseDetailSerializer, CourseReviewSerializer
 # Create your views here.
+class EnrollCourseAPIView(APIView):
+    """
+    POST /api/students/enroll/
+    Handles the enrollment logic. Expects {'course_id': <id>} in payload.
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
-class StudentEnrollCourseView(LoginRequiredMixin,FormView):
-    '''
-    Handles the enrollment logic
-    when a student clicks 'enroll', this view adds them to the course
-    '''
-    course = None
-    form_class = CourseEnrollForm
+    def post(self, request, *args, **kwargs):
+        course_id = request.data.get('course_id')
+        if not course_id:
+            return Response({"error": "course_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-    def form_valid(self, form):
-        self.course = form.cleaned_data['course']
+        course = get_object_or_404(Course, id=course_id)
 
-        # check if the user have been blocked 
-        if self.course.blocked_students.filter(id=self.request.user.id).exists():
-            # if blocked, show error message and prohibited from enroll
-            messages.error(self.request, "You have been blocked from this course. Contact the instructor.")
-            return redirect('student_course_detail', self.course.id)
+        # check if user have been blocked
+        if course.blocked_students.filter(id=request.user.id).exists():
+            return Response(
+                {"error": "You have been blocked from this course. Contact the instructor."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
 
-        self.course.students.add(self.request.user)
-        return super().form_valid(form)
-    
-    def get_success_url(self):
-        return reverse_lazy('student_course_detail', args=[self.course.id])
-    
-class StudentCourseListView(LoginRequiredMixin,ListView):
-    '''
-    Dashboard list only courses the student is enrolled in
-    '''
+        # enroll
+        course.students.add(request.user)
+        return Response(
+            {"message": f"Successfully enrolled in '{course.title}'."}, 
+            status=status.HTTP_200_OK
+        )
 
-    model = Course
-    template_name = 'students/course/list.html'
+class StudentCourseListAPIView(generics.ListAPIView):
+    """
+    GET /api/students/my-courses/
+    only courses the student is enrolled in.
+    """
+    serializer_class = StudentCourseListSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        # Only show courses where the current user is in the 'students' list
-        return qs.filter(students__in=[self.request.user])
+        return Course.objects.filter(students__in=[self.request.user]).prefetch_related('modules')
 
-class StudentCourseDetailView(LoginRequiredMixin,DetailView):
-    '''
-    Show the content of a specific course for enrolled students
-    '''
-    model = Course
-    template_name = 'students/course/detail.html'
-    
-    def get_object(self, queryset=None):
-        # check course object
-        obj = super().get_object(queryset)
+class StudentCourseDetailAPIView(generics.RetrieveAPIView):
+    """
+    GET /api/students/courses/<pk>/
+    Show the content of a specific course. Ensures the user is enrolled.
+    """
+    queryset = Course.objects.all()
+    serializer_class = StudentCourseDetailSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        course = super().get_object()
         
-        # check if student or teacher
-        is_student = self.request.user in obj.students.all()
-        is_owner = self.request.user == obj.owner
+        is_student = self.request.user in course.students.all()
+        is_owner = self.request.user == course.owner
         
-        # if not student and owner, kick out
+        # if not students or teacher, denied
         if not is_student and not is_owner:
             raise PermissionDenied("You must enroll in this course to view it.")
             
-        return obj
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # login to determine which module to display
-        course = self.object
+        return course
 
-        # check if a specific module_id was passed in the URL
-        if 'module_id' in self.kwargs:
-            # if yes, get that specific module
-            context['module'] = course.modules.get(id=self.kwargs['module_id'])
-        else:
-            # if no, default to the first module
-            context['module'] = course.modules.first()
+class CourseReviewCreateAPIView(generics.CreateAPIView):
+    """
+    POST /api/students/courses/<pk>/review/
+    View to handle course review submission.
+    """
+    serializer_class = CourseReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-        # check if the user was reviewed this course   
-        if self.request.user.is_authenticated:
-            try:
-                context['user_review'] = CourseReview.objects.get(course=course, student=self.request.user)
-            except CourseReview.DoesNotExist:
-                context['user_review'] = None
+    def perform_create(self, serializer):
+        course_id = self.kwargs.get('pk')
+        course = get_object_or_404(Course, id=course_id)
 
-        return context
+        # check if enrolled
+        if self.request.user not in course.students.all():
+            raise PermissionDenied("You must be enrolled to leave a review.")
 
-class StudentCourseReviewView(LoginRequiredMixin, View):
-    '''
-    View to handle course review submission
-    '''
-    def post(self, request, pk):
-        course = get_object_or_404(Course, id=pk)
-        
-        # Is the user enrolled?
-        if request.user not in course.students.all():
-            messages.error(request, "You must be enrolled to leave a review.")
-            return redirect('student_course_detail', pk)
+        # check if reviewed 
+        if CourseReview.objects.filter(course=course, student=self.request.user).exists():
+            raise PermissionDenied("You have already reviewed this course.")
 
-        # Check if already reviewed to prevent duplicates
-        already_reviewed = CourseReview.objects.filter(course=course, student=request.user).exists()
-        if already_reviewed:
-            messages.warning(request, "You have already reviewed this course.")
-            return redirect('student_course_detail', pk)
+        # save review with current user and course
+        serializer.save(course=course, student=self.request.user)
 
-        # Process the form
-        form = CourseReviewForm(data=request.POST)
-        if form.is_valid():
-            review = form.save(commit=False)
-            review.course = course
-            review.student = request.user
-            review.save()
-            messages.success(request, "Thank you! Your review has been posted.")
-        else:
-            messages.error(request, "Error submitting review. Please check the form.")
-            
-        return redirect('student_course_detail', pk)
+class CourseReviewUpdateAPIView(generics.UpdateAPIView):
+    """
+    PUT/PATCH /api/students/courses/<course_pk>/review/edit/
+    Allows students to edit their existing review.
+    """
+    serializer_class = CourseReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-class StudentCourseReviewEditView(LoginRequiredMixin,UpdateView):
-    model = CourseReview
-    form_class = CourseReviewForm
-    template_name = 'students/course/review_form.html'
-    
-    def get_object(self, queryset =None):
+    def get_object(self):
         course_pk = self.kwargs.get('pk')
+        # only get course review of current user review
         return get_object_or_404(CourseReview, course__id=course_pk, student=self.request.user)
-    
-    def get_success_url(self):
-        # after edit, redirect course detail
-        messages.success(self.request, "Review updated successfully!")
-        return reverse_lazy('student_course_detail', args=[self.kwargs['pk']])
 
-@login_required
-@require_POST
-def mark_content_complete(request):
-    content_id = request.POST.get('content_id')
+class ToggleContentCompleteAPIView(APIView):
+    """
+    POST /api/students/content/toggle-complete/
+    Marks or unmarks a content piece as completed.
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
-    if not content_id:
-        return JsonResponse({'status': 'error', 'message': 'No content_id provided'})
-    
-    content = get_object_or_404(Content, id=content_id)
+    def post(self, request, *args, **kwargs):
+        content_id = request.data.get('content_id')
+        if not content_id:
+            return Response({'error': 'No content_id provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        content = get_object_or_404(Content, id=content_id)
 
-    progress, created = UserContentProgress.objects.get_or_create(
-        student=request.user,
-        content=content
-    )
+        # use get_or_create to handle tick/untick 
+        progress, created = UserContentProgress.objects.get_or_create(
+            student=request.user,
+            content=content
+        )
 
-    if not created:
-        # 如果已经存在，说明是“取消勾选”，我们删掉它
-        progress.delete()
-        return JsonResponse({'status': 'unmarked', 'content_id': content_id})
-    else:
-        # 如果是新创建的，说明是“打勾”
-        return JsonResponse({'status': 'marked', 'content_id': content_id})
+        if not created:
+            # if exist untick
+            progress.delete()
+            return Response({'status': 'unmarked', 'content_id': content_id}, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'marked', 'content_id': content_id}, status=status.HTTP_201_CREATED)

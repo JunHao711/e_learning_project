@@ -1,17 +1,37 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
 
-urlpatterns = [
-    path('signup/', views.SignUpOptionView.as_view(),name='signup_option'),
-    path('signup/student/', views.StudentSignUpView.as_view(), name='student_signup'),
-    path('signup/teacher/', views.TeacherSignUpView.as_view(), name='teacher_signup'),
-    path('search/', views.UserSearchView.as_view(), name='user_search'),
-    path('profile/edit/', views.UserEditView.as_view(), name='user_profile_edit'),
-    path('profile/<str:username>/', views.UserProfileView.as_view(), name='user_profile'),
-    path('site-admin/dashboard/', views.AdminDashboardView.as_view(), name='site_admin_dashboard'),
-    path('site-admin/users/', views.AdminUserListView.as_view(), name='site_admin_user_list'),
-    path('site-admin/users/<int:user_id>/toggle-active/', views.UserToggleActiveView.as_view(), name='site_admin_user_toggle'),
-    path('site-admin/courses/', views.AdminCourseListView.as_view(), name='site_admin_course_list'),
-    path('site-admin/courses/<int:course_id>/delete/', views.AdminCourseDeleteView.as_view(), name='site_admin_course_delete'),
-]
+app_name = 'users' # set app name to support URL namespaces
 
+router = DefaultRouter()
+router.register(r'notifications', views.NotificationViewSet, basename='notification')
+
+urlpatterns = [
+    # registration endpoint.
+    path('register/', views.UserRegistrationAPIView.as_view(), name='api_user_register'),
+    
+    # search for other users endpoint
+    path('search/', views.UserSearchAPIView.as_view(), name='api_user_search'),
+    
+    # retrieve or update the current user endpoint
+    path('me/', views.UserMeAPIView.as_view(), name='api_user_me'),
+    
+    # changing password endpoint
+    path('me/change-password/', views.ChangePasswordAPIView.as_view(), name='api_change_password'),
+    
+    # post a new status update to their profile endpoint
+    path('status/', views.UserStatusCreateAPIView.as_view(), name='api_user_status_create'),
+    
+    # fetch the public profile data of a specific user
+    path('profile/<str:username>/', views.UserProfileAPIView.as_view(), name='api_user_profile'),
+    
+    # admin dashboard
+    path('admin/dashboard/', views.AdminDashboardAPIView.as_view(), name='api_admin_dashboard'),
+    # list all users
+    path('admin/users/', views.AdminUserListAPIView.as_view(), name='api_admin_user_list'),
+    # toggle a user's active status 
+    path('admin/users/<int:user_id>/toggle-active/', views.AdminUserToggleAPIView.as_view(), name='api_admin_user_toggle'),
+    
+    path('', include(router.urls)),
+]

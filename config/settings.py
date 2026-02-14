@@ -11,12 +11,12 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = '/media/'
-
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 
 # Quick-start development settings - unsuitable for production
@@ -32,11 +32,6 @@ ALLOWED_HOSTS = []
 
 # tell django ingore its default user table
 AUTH_USER_MODEL = 'users.CustomUser'
-
-# redirect url after login
-LOGIN_REDIRECT_URL = 'course_list' 
-# redirect url after logout
-LOGOUT_REDIRECT_URL = 'course_list'
 
 # Allow the browser to send the Referer header to YouTube
 SECURE_REFERRER_POLICY = 'no-referrer-when-downgrade'
@@ -56,9 +51,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
+    'rest_framework_simplejwt',
     'corsheaders',
     'drf_spectacular',
-    'bootstrap5',
     'django_filters',
 
     'users.apps.UsersConfig',
@@ -71,6 +66,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
     ],
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
@@ -81,12 +80,28 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
 }
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60), # Access token lasts 1 hour
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),    # Refresh token lasts 7 days
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),         
+}
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'E-Learning API',
     'DESCRIPTION': 'API for Courses, Modules, and Contents management.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'SECURITY': [{'jwt': []}],
 }
+
+# Allows the React development server to communicate with Django
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

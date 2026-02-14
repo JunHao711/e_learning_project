@@ -1,32 +1,37 @@
 from django.db import models
-from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Max
 
 class OrderField(models.PositiveIntegerField):
+    """
+    A custom field that automatically assigns an order value based on 
+    the maximum existing value within a specific subset of objects.
+    """
     def __init__(self, for_fields=None, *args, **kwargs):
         self.for_fields = for_fields
         super().__init__(*args, **kwargs)
 
     def pre_save(self, model_instance, add):
         """
-        在保存之前计算 order 的值
+        Calculates the order value before saving the object to the database.
         """
         if getattr(model_instance, self.attname) is None:
-            # 如果没有指定 order 值，就自动计算
-            try:
-                qs = self.model.objects.all()
-                if self.for_fields:
-                    # 比如: 筛选同一个 Course 下的所有 Module
-                    query = {field: getattr(model_instance, field) for field in self.for_fields}
-                    qs = qs.filter(**query)
-                
-                # 获取当前最大的 order 值
-                last_item = qs.latest(self.attname)
-                value = last_item.order + 1
-            except ObjectDoesNotExist:
-                # 如果是第一个，就设为 0
+            # If no order is specified, calculate it automatically
+            qs = self.model.objects.all()
+            if self.for_fields:
+                # Filter by related fields (e.g., all modules within the same course)
+                query = {field: getattr(model_instance, field) for field in self.for_fields}
+                qs = qs.filter(**query)
+            
+            # use Max() aggregation instead of fetching the object.
+            last_item = qs.aggregate(max_value=Max(self.attname))
+            
+            if last_item['max_value'] is not None:
+                value = last_item['max_value'] + 1
+            else:
+                # If it's the first item, start at 0
                 value = 0
             
-            # 赋值给当前对象
+            # Assign the calculated value to the instance
             setattr(model_instance, self.attname, value)
             return value
         else:

@@ -1,18 +1,20 @@
 from django.urls import path
 from . import views
 
+app_name = 'students'
+
 urlpatterns = [
-    path('enroll-course/', views.StudentEnrollCourseView.as_view(), name='student_enroll_course'),
-         
-    path('courses/', views.StudentCourseListView.as_view(), name='student_course_list'),
-         
-    path('course/<int:pk>/', views.StudentCourseDetailView.as_view(),name='student_course_detail'),
-    
-    path('course/<int:pk>/review/', views.StudentCourseReviewView.as_view(), name='student_course_review'),
+    # enroll a course
+    path('enroll/', views.EnrollCourseAPIView.as_view(), name='api_student_enroll'),
+    # course user enrolled in      
+    path('my-courses/', views.StudentCourseListAPIView.as_view(), name='api_student_course_list'),         
+    # course detail 
+    path('course/<int:pk>/', views.StudentCourseDetailAPIView.as_view(),name='api_student_course_detail'),
+    # post course review
+    path('course/<int:pk>/review/', views.CourseReviewCreateAPIView.as_view(), name='api_student_course_review'),
+    # edit course review
+    path('course/<int:pk>/review/edit/',views.CourseReviewUpdateAPIView.as_view(), name='api_student_course_review_edit'),
+    # toggle of complete the course
+    path('content/toggle-complete/', views.ToggleContentCompleteAPIView.as_view(), name='api_toggle_content_complete'),
 
-    path('course/<int:pk>/<module_id>/',views.StudentCourseDetailView.as_view(), name='student_course_detail_module'),
-    
-    path('content/complete/', views.mark_content_complete, name='mark_content_complete'),
-
-    path('course/<int:pk>/review/edit/',views.StudentCourseReviewEditView.as_view(), name='student_course_review_edit')
-]
+]  
