@@ -314,6 +314,17 @@ class CourseReviewCreateAPIView(APIView):
         message = "Review submitted successfully!" if created else "Review updated successfully!"
         return Response({"message": message}, status=status.HTTP_200_OK)
 
+class TeacherModuleRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET, PUT, DELETE /api/courses/teacher/modules/<id>/
+    Allows a teacher to delete or update a specific module.
+    """
+    serializer_class = ModuleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Module.objects.filter(course__owner=self.request.user)
+
 class StudentEnrolledCoursesAPIView(generics.ListAPIView):
     """
     GET /api/courses/enrolled/

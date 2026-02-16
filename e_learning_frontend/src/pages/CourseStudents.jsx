@@ -1,7 +1,7 @@
-// src/pages/CourseStudents.jsx
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
 
 export default function CourseStudents() {
   const { id } = useParams(); // Course ID
@@ -10,29 +10,23 @@ export default function CourseStudents() {
   const [activeStudents, setActiveStudents] = useState([]);
   const [blockedStudents, setBlockedStudents] = useState([]);
   
-  // Tab Management: 'active' or 'blocked'
+  // used for toggles between active and block views
   const [currentTab, setCurrentTab] = useState('active');
   const [isLoading, setIsLoading] = useState(true);
-
-  // Helper function for media URLs
-  const getMediaUrl = (path) => {
-    if (!path) return '';
-    return path.startsWith('http') ? path : `http://localhost:8000${path}`;
-  };
 
   const fetchCourseAndStudents = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch Course Info (for the header)
+      // Fetch Course Info
       const courseRes = await api.get(`courses/teacher/${id}/`);
       setCourse(courseRes.data);
 
-      // 2. Fetch Active Enrolled Students
+      // Fetch Active Enrolled Students
       const activeRes = await api.get(`courses/teacher/${id}/students/`);
       const activeData = activeRes.data.results || activeRes.data;
       setActiveStudents(Array.isArray(activeData) ? activeData : []);
 
-      // 3. Fetch Blocked Students
+      // Fetch Blocked Students
       const blockedRes = await api.get(`courses/teacher/${id}/students/?filter=blocked`);
       const blockedData = blockedRes.data.results || blockedRes.data;
       setBlockedStudents(Array.isArray(blockedData) ? blockedData : []);
@@ -48,7 +42,7 @@ export default function CourseStudents() {
     fetchCourseAndStudents();
   }, [id]);
 
-  // 🌟 Action: Kick & Block Student
+  // Kick & Block Student
   const handleBlock = async (studentId, studentName) => {
     if (!window.confirm(`Are you sure you want to block ${studentName}? They will be removed from the course.`)) return;
     
@@ -62,7 +56,6 @@ export default function CourseStudents() {
     }
   };
 
-  // 🌟 Action: Unblock Student
   const handleUnblock = async (studentId, studentName) => {
     if (!window.confirm(`Unblock ${studentName}? They will need to re-enroll manually.`)) return;
     
@@ -80,7 +73,7 @@ export default function CourseStudents() {
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
         
-        {/* Header Section */}
+        {/* header */}
         <div>
           <Link to="/dashboard" className="text-sm font-medium text-slate-500 hover:text-indigo-600 flex items-center gap-1 mb-2">
             &larr; Back to Dashboard
@@ -93,7 +86,7 @@ export default function CourseStudents() {
           </h1>
         </div>
 
-        {/* 🌟 Tab Navigation */}
+        {/* Nav bar */}
         <div className="border-b border-slate-200">
           <nav className="-mb-px flex space-x-8">
             <button
@@ -119,7 +112,7 @@ export default function CourseStudents() {
           </nav>
         </div>
 
-        {/* 🌟 Content Area: Active Students */}
+        {/* active students */}
         {currentTab === 'active' && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             {activeStudents.length === 0 ? (
@@ -169,7 +162,7 @@ export default function CourseStudents() {
           </div>
         )}
 
-        {/* 🌟 Content Area: Blocked Students */}
+        {/* blocked students */}
         {currentTab === 'blocked' && (
           <div className="bg-white rounded-2xl shadow-sm border border-rose-200 overflow-hidden">
             <div className="bg-rose-50 px-6 py-4 border-b border-rose-200">

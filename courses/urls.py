@@ -17,6 +17,7 @@ urlpatterns = [
     path('teacher/<int:pk>/', views.TeacherCourseRetrieveUpdateDestroyAPIView.as_view(), name='api_teacher_course_rud'),
     # module CRUD
     path('teacher/<int:course_pk>/modules/', views.TeacherModuleListCreateAPIView.as_view(), name='api_teacher_module_list_create'),
+    path('teacher/modules/<int:pk>/', views.TeacherModuleRetrieveUpdateDestroyAPIView.as_view(), name='api_teacher_module_rud'),
     # create and delete course content
     path('teacher/modules/<int:module_id>/content/<str:model_name>/', views.TeacherContentCreateAPIView.as_view(), name='api_teacher_content_create'),
     path('teacher/content/<int:id>/', views.TeacherContentDeleteAPIView.as_view(), name='api_teacher_content_delete'),

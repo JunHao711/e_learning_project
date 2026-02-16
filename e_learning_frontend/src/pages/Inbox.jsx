@@ -1,21 +1,20 @@
-// src/pages/Inbox.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
+
 
 export default function Inbox() {
   const { userId } = useParams(); // Extract target_user_id from URL if starting a new chat
   const navigate = useNavigate();
-
   const [currentUser, setCurrentUser] = useState(null);
   const [conversations, setConversations] = useState([]);
   
-  // Active Chat State
+  // chat state
   const [activePartner, setActivePartner] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  
-  // WebSocket & File State
+  // web socket state
   const ws = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const [roomName, setRoomName] = useState('');
@@ -24,13 +23,7 @@ export default function Inbox() {
 
   const messagesEndRef = useRef(null);
 
-  // Helper: format Django media URLs securely
-  const getMediaUrl = (path) => {
-    if (!path) return '';
-    return path.startsWith('http') ? path : `http://localhost:8000${path}`;
-  };
-
-  // 1. Initial Load: Fetch 'Me' and 'Recent Conversations'
+  // fetch me and recent conversations
   useEffect(() => {
     const initInbox = async () => {
       try {
@@ -40,7 +33,7 @@ export default function Inbox() {
         const convRes = await api.get('chat/conversations/');
         setConversations(convRes.data.conversations || []);
         
-        // If there's no userId in URL but we have conversations, auto-select the first one
+        // If there no userId in URL but we have conversations, auto-select the first one
         if (!userId && convRes.data.conversations?.length > 0) {
           navigate(`/inbox/${convRes.data.conversations[0].partner_id}`, { replace: true });
         }
@@ -51,7 +44,7 @@ export default function Inbox() {
     initInbox();
   }, []); // Only run once on mount
 
-  // 2. 🌟 When userId changes (clicking a sidebar item), load chat history & get room_name
+  // When userId changes, load chat history & get room_name
   useEffect(() => {
     if (!userId) {
       setActivePartner(null);
@@ -86,7 +79,7 @@ export default function Inbox() {
     loadActiveChat();
   }, [userId, conversations]);
 
-  // 3. 🌟 Establish WebSocket connection when roomName is acquired
+  // create websocket connection when roomName is acquired
   useEffect(() => {
     if (!roomName) return;
 
@@ -119,8 +112,6 @@ export default function Inbox() {
       };
       
       setMessages((prev) => [...prev, incomingMsg]);
-      
-      // Optional: Refresh conversations list to update the 'last_message' snippet in sidebar
       api.get('chat/conversations/').then(res => setConversations(res.data.conversations || []));
     };
 
@@ -133,12 +124,8 @@ export default function Inbox() {
     };
   }, [roomName]);
 
-  // 4. Auto-scroll
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
-  // 5. Handle Send Message
+  // handle send message
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() && !file) return;
@@ -163,7 +150,7 @@ export default function Inbox() {
     }
 
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      // Send payload matching your PrivateChatConsumer requirements
+      // Send payload matching PrivateChatConsumer requirements
       const payload = {
         message: newMessage,
         file_url: uploadedFileUrl,
@@ -181,9 +168,7 @@ export default function Inbox() {
     <div className="min-h-screen bg-slate-50 flex py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl w-full mx-auto flex bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden h-[85vh]">
         
-        {/* ========================================== */}
-        {/* Left Sidebar: Conversations List */}
-        {/* ========================================== */}
+        {/* chat list */}
         <div className="w-1/3 border-r border-slate-200 flex flex-col bg-slate-50">
           <div className="p-6 border-b border-slate-200 bg-white">
             <h2 className="text-2xl font-extrabold text-slate-900">Inbox</h2>
@@ -230,9 +215,7 @@ export default function Inbox() {
           </div>
         </div>
 
-        {/* ========================================== */}
-        {/* Right Pane: Active Chat Window */}
-        {/* ========================================== */}
+        {/* right side - chat window */}
         <div className="w-2/3 flex flex-col bg-white">
           {!userId ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
@@ -252,7 +235,7 @@ export default function Inbox() {
                 </div>
               </div>
 
-              {/* Messages Feed */}
+              {/* messages */}
               <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-6">
                 {messages.length === 0 ? (
                   <div className="text-center text-slate-400 mt-10 text-sm font-medium">
@@ -289,7 +272,7 @@ export default function Inbox() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Chat Input */}
+              {/* chat input */}
               <div className="bg-white border-t border-slate-200 p-4">
                 {file && (
                   <div className="mb-2 flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg max-w-max">

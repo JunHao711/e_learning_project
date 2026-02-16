@@ -16,7 +16,6 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Send credentials to Django's JWT endpoint
       const response = await api.post('token/', {
         username: username,
         password: password
@@ -34,7 +33,7 @@ export default function Login() {
       if (err.response && err.response.status === 401) {
         const errorDetail = err.response?.data?.detail || "";
         if (errorDetail.includes("No active account")) {
-          // Django SimpleJWT 默认在账号 is_active=False 时返回这个消息
+          // if is_active=False, return this message
           setError("Your account has been banned. Please contact admin");
         } else if (err.response?.status === 401) {
           setError("Invalid username or password. Try again");

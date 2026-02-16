@@ -5,6 +5,7 @@ import api from '../api/axios';
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
+  // Authentication states
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   
@@ -16,26 +17,29 @@ export default function Navbar() {
   // Logout Modal State
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // Check login status and fetch user info on mount / route change
   useEffect(() => {
+    // check token exists in local storage 
     const token = localStorage.getItem('access_token');
-    setIsLoggedIn(!!token);
+    setIsLoggedIn(!!token); // convert to boolean and check if log in 
     
     if (token) {
+      // fetch user profile
       api.get('users/me/')
         .then(res => {
           setCurrentUser(res.data);
-          // 🌟 只有非 Admin 用户才需要去拉取通知红点
+          // only fetch notification if the user is not an dmin user type
           if (res.data.role !== 'admin') {
             fetchNotifications();
           }
         })
         .catch(err => console.error(err));
     } else {
+      // Clear user data if token not found
       setCurrentUser(null);
     }
-  }, [location.pathname]);
+  }, [location.pathname]); // trigger when path changes
 
+  // Fetch notification 
   const fetchNotifications = async () => {
     try {
       const res = await api.get('users/notifications/');
@@ -46,6 +50,7 @@ export default function Navbar() {
     }
   };
   
+  // Mark a specific notification as read and navigate to its link
   const handleMarkAsRead = async (notifId, link) => {
     try {
       await api.post(`users/notifications/${notifId}/mark_read/`);
@@ -57,6 +62,7 @@ export default function Navbar() {
     }
   };
 
+  // Mark all notifications as read
   const handleMarkAllRead = async () => {
     try {
       await api.post('users/notifications/mark_all_read/');
@@ -69,6 +75,7 @@ export default function Navbar() {
   // Click outside to close notification dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // if click is not inside the dropdown, close it
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
@@ -77,15 +84,20 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // handle user logout
   const handleLogout = () => {
+    // remove token
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    // reset UI 
     setIsLoggedIn(false);
     setCurrentUser(null);
     setShowLogoutModal(false);
+    // navigate to login page
     navigate('/login');
   };
 
+  // calculate the number of unread notifications
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
@@ -94,20 +106,18 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             
-            {/* Logo */}
+            {/* logo section */}
             <div className="flex items-center">
               <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex-shrink-0 flex items-center gap-2">
                 <span className="text-2xl font-black text-indigo-600 tracking-tighter">E Learning Website</span>
               </Link>
             </div>
             
-            {/* Navigation Links */}
+            {/* Navigation Links based on role */}
             <div className="flex items-center gap-6">
               {isLoggedIn ? (
+                // if is admin
                 currentUser?.role === 'admin' ? (
-                  // ==========================================
-                  // 🛡️ ADMIN 视图 (极简)
-                  // ==========================================
                   <>
                     <Link to="/dashboard" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Admin Panel</Link>
                     <button 
@@ -118,9 +128,7 @@ export default function Navbar() {
                     </button>
                   </>
                 ) : (
-                  // ==========================================
-                  // 👨‍🏫 老师 / 👨‍🎓 学生 视图 (完整)
-                  // ==========================================
+                  //if is student/ teacher
                   <>
                     <Link to="/" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Catalog</Link>
                     <Link to="/dashboard" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Dashboard</Link>
@@ -179,9 +187,7 @@ export default function Navbar() {
                   </>
                 )
               ) : (
-                // ==========================================
-                // 👻 未登录访客视图
-                // ==========================================
+                // guest view
                 <>
                   <Link to="/" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Catalog</Link>
                   <Link to="/login" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Log in</Link>
@@ -193,9 +199,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* ========================================== */}
       {/* Logout Modal */}
-      {/* ========================================== */}
       {showLogoutModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform transition-all">

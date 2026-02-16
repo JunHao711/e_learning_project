@@ -3,7 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import api from '../api/axios';
 
 export default function Register() {
+  // store step of the registration process
+  // step 1 is role selection
+  // step 2 is registration form
   const [step, setStep] = useState(1);
+  // consolidates user data into a object
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -11,7 +15,7 @@ export default function Register() {
     role: '' 
   });
   
-  // 新增状态：确认密码、显示密码开关、成功提示
+  // UI states for confirm password, show password, success message
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -24,24 +28,26 @@ export default function Register() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // Sets the chosen role 
   const selectRole = (selectedRole) => {
     setFormData({ ...formData, role: selectedRole });
     setStep(2); 
-    setError(''); // 切换步骤时清空错误
+    setError('');
   };
 
+  // handles the final form submission
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
 
-    // 🌟 1. 前端第一道防线：密码长度验证
+    // check password length should longer 8
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters long.');
       return;
     }
 
-    // 🌟 2. 前端第二道防线：双重密码校验
+    // password should maching with comfirmPassword
     if (formData.password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -50,12 +56,13 @@ export default function Register() {
     setIsLoading(true);
 
     try {
+      // send post request to backend
       await api.post('users/register/', formData);
       
-      // 🌟 3. 优雅的成功反馈与延迟跳转
+      // sucess msg 
       setSuccessMsg('Account created successfully! Redirecting to login...');
       
-      // 延迟 2.5 秒后跳转，让用户看清成功提示
+      // delay navigation by 2500 ms to let user read the message 
       setTimeout(() => {
         navigate('/login');
       }, 2500);
@@ -68,7 +75,7 @@ export default function Register() {
       } else {
         setError('Registration failed. Please try again later.');
       }
-      setIsLoading(false); // 只有失败时才恢复按钮状态，成功了就保持 loading 状态防止重复点击
+      setIsLoading(false);
     } 
   };
 
@@ -76,9 +83,7 @@ export default function Register() {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl w-full">
         
-        {/* ========================================== */}
-        {/* Step 1: 角色选择卡片 */}
-        {/* ========================================== */}
+        {/* Role selection card */}
         {step === 1 && (
           <div className="space-y-8 animate-fade-in">
             <div className="text-center">
@@ -117,9 +122,7 @@ export default function Register() {
           </div>
         )}
 
-        {/* ========================================== */}
-        {/* Step 2: 注册表单 */}
-        {/* ========================================== */}
+        {/* Registration form */}
         {step === 2 && (
           <div className="max-w-md mx-auto bg-white p-10 rounded-xl shadow-lg border border-slate-100 animate-fade-in">
             <div className="text-center mb-8">
@@ -136,14 +139,14 @@ export default function Register() {
               </p>
             </div>
 
-            {/* 错误提示 */}
+            {/* Error message */}
             {error && (
               <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
 
-            {/* 成功提示 */}
+            {/* Success message */}
             {successMsg && (
               <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
@@ -176,7 +179,7 @@ export default function Register() {
                 />
               </div>
 
-              {/* Password 带有眼睛图标 */}
+              {/* Password with eye icon */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
                 <div className="relative">
@@ -193,7 +196,7 @@ export default function Register() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-indigo-600 cursor-pointer"
                   >
-                    {/* 简单的 SVG 眼睛图标切换 */}
+                    {/* show password */}
                     {showPassword ? (
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -209,7 +212,7 @@ export default function Register() {
                 <p className="mt-1 text-xs text-slate-500">Must be at least 8 characters.</p>
               </div>
 
-              {/* Confirm Password */}
+              {/* confirm password */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
                 <input

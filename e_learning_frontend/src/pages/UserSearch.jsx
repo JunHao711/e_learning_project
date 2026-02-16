@@ -2,23 +2,18 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
 
 export default function UserSearch() {
+  // user input for search bar
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
 
-  // Helper function to format Django media URLs securely
-  const getMediaUrl = (path) => {
-    if (!path) return '';
-    if (path.startsWith('http')) return path;
-    return `http://localhost:8000${path}`;
-  };
-
-  // 🌟 Industry Standard: Debounced Search Effect
+  // Debounced Search Effect
   useEffect(() => {
-    // If the search query is empty, clear results and stop
+    // If the search query is empty, clear results
     if (!searchQuery.trim()) {
       setResults([]);
       return;
@@ -27,11 +22,11 @@ export default function UserSearch() {
     setIsSearching(true);
     setError('');
 
-    // Setup a timer to delay the API call (Debouncing)
+    // Setup a timer to delay the API call
+    // wait for 500ms after the users stop typing before request
     const delayDebounceFn = setTimeout(async () => {
       try {
         const response = await api.get(`users/search/?q=${encodeURIComponent(searchQuery)}`);
-        // Handle DRF pagination structure if present, otherwise use raw data
         const data = response.data.results ? response.data.results : response.data;
         setResults(Array.isArray(data) ? data : []);
       } catch (err) {
@@ -42,9 +37,9 @@ export default function UserSearch() {
       }
     }, 500); // Wait 500ms after the user stops typing
 
-    // Cleanup function: clears the timer if the user types again within 500ms
+    // clears the timer if the user types again within 500ms
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  }, [searchQuery]); // runs every time searchQuery changes 
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">

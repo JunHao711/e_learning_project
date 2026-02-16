@@ -1,7 +1,7 @@
-// src/pages/CourseChat.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
 
 export default function CourseChat() {
   const { id } = useParams(); // course_id
@@ -22,12 +22,7 @@ export default function CourseChat() {
   // Auto-scroll ref
   const messagesEndRef = useRef(null);
 
-  const getMediaUrl = (path) => {
-    if (!path) return '';
-    return path.startsWith('http') ? path : `http://localhost:8000${path}`;
-  };
-
-  // 1. Fetch current user, course info, and historical messages
+  // Fetch current user, course info, and historical messages
   useEffect(() => {
     const initChat = async () => {
       try {
@@ -50,16 +45,11 @@ export default function CourseChat() {
     initChat();
   }, [id]);
 
-  // 2. 🌟 Establish WebSocket Connection
+  // Establish WebSocket Connection
   useEffect(() => {
     const token = localStorage.getItem('access_token');
-    // Note: In a production Django channels setup, passing token via query param 
-    // requires a custom JWTAuthMiddlewareStack in routing.py. 
-    // Assuming your backend expects the standard token payload or session auth.
     const wsUrl = `ws://localhost:8000/ws/chat/${id}/?token=${token}`;
-    
     ws.current = new WebSocket(wsUrl);
-
     ws.current.onopen = () => {
       console.log('WebSocket Connected to Course Chat');
       setIsConnected(true);
@@ -67,12 +57,10 @@ export default function CourseChat() {
 
     ws.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      
-      // 🌟 核心修复：拦截后端的报错，防止渲染空泡泡
       if (data.error) {
         console.error("WebSocket Error:", data.error);
-        alert("Chat Error: " + data.error); // 提示用户
-        return; // 终止执行，不把错误当成聊天记录加进数组
+        alert("Chat Error: " + data.error);
+        return;
       }
 
       const incomingMsg = {
@@ -96,26 +84,20 @@ export default function CourseChat() {
     };
   }, [id]);
 
-  // 3. Auto-scroll to bottom whenever messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // 4. 🌟 Handle File Upload & Sending Message
+  // Handle file upload & sending message
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() && !file) return;
 
     let uploadedFileUrl = null;
 
-    // If there's a file, upload it via REST API first
     if (file) {
       setIsUploading(true);
       const formData = new FormData();
       formData.append('file', file);
       
       try {
-        // Must match your ChatFileUploadAPIView endpoint
+        // Must match  ChatFileUploadAPIView endpoint
         const uploadRes = await api.post('chat/upload/', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });

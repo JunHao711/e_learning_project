@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
 
-const getMediaUrl = (path) => {
-  if (!path) return '';
-  return path.startsWith('http') ? path : `http://localhost:8000${path}`;
-};
+function StatCard({ title, value, color }) {
+  const colors = {
+    indigo: "bg-indigo-50 text-indigo-900 border-indigo-100",
+    emerald: "bg-emerald-50 text-emerald-900 border-emerald-100",
+    purple: "bg-purple-50 text-purple-900 border-purple-100"
+  };
+  return (
+    <div className={`p-6 rounded-xl border ${colors[color]}`}>
+      <h3 className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{title}</h3>
+      <span className="text-3xl font-black">{value || 0}</span>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -16,7 +26,6 @@ export default function Dashboard() {
   const [isPosting, setIsPosting] = useState(false);
 
   useEffect(() => {
-    // fetch all necessary data
     const fetchDashboardData = async () => {
       try {
         // fetch the current logged-in user's profile
@@ -28,15 +37,21 @@ export default function Dashboard() {
         const formattedUser = { ...userData, role: normalizedRole };
         setUser(formattedUser);
 
+        // if is admin
         if (normalizedRole === 'admin') {
           const coursesRes = await api.get('courses/admin/all/');
           const fetchedCourses = coursesRes.data.results ? coursesRes.data.results : coursesRes.data;          
           setCourses(Array.isArray(fetchedCourses) ? fetchedCourses : []);
-        }else if(normalizedRole === 'teacher'){
+        
+        }
+        // if is teacher
+        else if(normalizedRole === 'teacher'){
           const coursesRes = await api.get('courses/teacher/mine');
           const fetchedCourses = coursesRes.data.results ? coursesRes.data.results : coursesRes.data;          
           setCourses(Array.isArray(fetchedCourses) ? fetchedCourses : []);
-        }else{
+        }
+        // if is students
+        else{
           const coursesRes = await api.get('courses/enrolled/');
           const fetchedCourses = coursesRes.data.results ? coursesRes.data.results : coursesRes.data;          
           setCourses(Array.isArray(fetchedCourses) ? fetchedCourses : []);
@@ -57,11 +72,13 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
+  // handle status update
   const handlePostStatus = async (e) => {
     e.preventDefault();
     if (!statusText.trim()) return;
     setIsPosting(true);
     try {
+      // partially update the user's bio
       await api.patch('users/me/', { bio: statusText }); 
       alert("Status updated successfully on your profile!");
       setStatusText('');
@@ -84,7 +101,7 @@ export default function Dashboard() {
     );
   }
 
-  // Error state
+  // error state
   if (error) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -102,7 +119,7 @@ export default function Dashboard() {
         <div className="mb-8 flex justify-between items-end">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">
-              Welcome back, {user?.username} 👋
+              Welcome back, {user?.username}
             </h1>
             <p className="mt-2 text-sm text-slate-600">
               {user?.role === 'teacher' 
@@ -123,7 +140,7 @@ export default function Dashboard() {
         </div>
         
 
-        {user?.role === 'students' && (
+        {user?.role !== 'admin' && (
           <div className="mb-10 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-8">
             <form onSubmit={handlePostStatus} className="flex gap-4">
               <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold flex-shrink-0">
@@ -241,7 +258,6 @@ function StudentWorkspace({ courses }) {
 
       {courses.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-          <div className="text-5xl mb-4">🎓</div>
           <h3 className="text-xl font-bold text-slate-900">You haven't enrolled in any courses yet.</h3>
           <p className="text-slate-500 mt-2 mb-6">Explore the catalog and start your learning journey today!</p>
           <Link to="/" className="inline-block px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors shadow-sm">
@@ -269,7 +285,6 @@ function StudentWorkspace({ courses }) {
                   {course.title}
                 </h3>
                 
-                {/* 🌟 核心跳转：前往我们的沉浸式播放器 */}
                 <div className="mt-auto border-t border-slate-100 pt-4">
                   <Link 
                     to={`/student/course/${course.id}`}
@@ -289,24 +304,22 @@ function StudentWorkspace({ courses }) {
 }
 
 function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses }) {
-  const [activeTab, setActiveTab] = useState('overview'); // Tabs: overview, users, courses, categories
+  const [activeTab, setActiveTab] = useState('overview'); 
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [newSubject, setNewSubject] = useState({ title: '', slug: '' });
-  
   const [dashboardStats, setDashboardStats] = useState(null);
   const [usersList, setUsersList] = useState([]);
   const [coursesList, setCoursesList] = useState(initialCourses || []);
-  const [subjectsList, setSubjectsList] = useState([]); // 🌟 新增：分类列表
+  const [subjectsList, setSubjectsList] = useState([]); 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 自动生成 Slug
+  // auto generate slug
   const handleTitleChange = (val) => {
     const slug = val.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
     setNewSubject({ title: val, slug: slug });
   };
 
-  // 获取数据
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -321,7 +334,6 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
           const res = await api.get('courses/admin/all/');
           setCoursesList(res.data.results || res.data);
         } else if (activeTab === 'categories') {
-          // 🌟 获取分类列表
           const res = await api.get('courses/subjects/');
           setSubjectsList(res.data.results || res.data);
         }
@@ -334,12 +346,11 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
     fetchData();
   }, [activeTab]);
 
-  // 添加分类
+  // handle add subject
   const handleAddSubject = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      // 🌟 注意：如果你的 router 是在 courses 下，路径是 courses/subjects/
       await api.post('courses/subjects/', newSubject);
       alert("Category added!");
       setShowSubjectModal(false);
@@ -355,7 +366,7 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
     }
   };
 
-  // 删除分类
+  // handle delete subject
   const handleDeleteSubject = async (id, title) => {
     if (!window.confirm(`Delete category "${title}"? Courses in this category might be affected.`)) return;
     try {
@@ -366,7 +377,7 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
     }
   };
 
-  // 用户封禁/解封
+  // ban/unbanned user
   const handleToggleActive = async (userId, username, currentStatus) => {
     const action = currentStatus ? "BAN" : "UNBAN";
     if (!window.confirm(`Confirm ${action} for ${username}?`)) return;
@@ -379,7 +390,7 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[60vh]">
       
-      {/* 🌟 Tab 导航栏 */}
+      {/* nav bar */}
       <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-wrap gap-4 items-center justify-between">
         <div className="flex gap-6">
           {['overview', 'users', 'courses', 'categories'].map(tab => (
@@ -393,7 +404,6 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
           ))}
         </div>
         
-        {/* 🌟 仅在分类或课程页显示添加按钮 */}
         <button 
           onClick={() => setShowSubjectModal(true)}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer"
@@ -442,7 +452,7 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
               </div>
             )}
 
-            {/* 🌟 新增：Category List Tab */}
+            {/* category list tab */}
             {activeTab === 'categories' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {subjectsList.map(s => (
@@ -459,7 +469,7 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
               </div>
             )}
 
-          {/* TAB 3: COURSES LIST */}
+          {/* courses list */}
           {activeTab === 'courses' && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
@@ -502,7 +512,7 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
         )}
       </div>
 
-      {/* Add Subject Modal (保持之前的逻辑) */}
+      {/* Add Subject Modal */}
       {showSubjectModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
@@ -520,17 +530,3 @@ function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses
   );
 }
 
-// 辅助小组件
-function StatCard({ title, value, color }) {
-  const colors = {
-    indigo: "bg-indigo-50 text-indigo-900 border-indigo-100",
-    emerald: "bg-emerald-50 text-emerald-900 border-emerald-100",
-    purple: "bg-purple-50 text-purple-900 border-purple-100"
-  };
-  return (
-    <div className={`p-6 rounded-xl border ${colors[color]}`}>
-      <h3 className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{title}</h3>
-      <span className="text-3xl font-black">{value || 0}</span>
-    </div>
-  );
-}

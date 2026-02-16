@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
+
 
 export default function CourseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
   const [course, setCourse] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -15,6 +16,7 @@ export default function CourseDetail() {
   const [comment, setComment] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
+  // fetch current user data
   useEffect(() => {
     const fetchUser = async () => {
       const token = localStorage.getItem('access_token');
@@ -30,13 +32,13 @@ export default function CourseDetail() {
     fetchUser();
   }, []);
 
+  // handle review submission
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     setIsSubmittingReview(true);
     try {
       await api.post(`courses/${id}/review/`, { rating, comment });
       alert("Thank you for your feedback!");
-      // 重新拉取一次课程详情，以刷新评价列表和平均分
       const response = await api.get(`courses/${id}/`);
       setCourse(response.data);
       setComment('');
@@ -48,11 +50,7 @@ export default function CourseDetail() {
     }
   };
 
-  const getMediaUrl = (path) => {
-    if (!path) return '';
-    return path.startsWith('http') ? path : `http://localhost:8000${path}`;
-  };
-
+  // fetch the specifc course details
   useEffect(() => {
     const fetchCourseDetail = async () => {
       try {
@@ -68,6 +66,7 @@ export default function CourseDetail() {
     fetchCourseDetail();
   }, [id]);
 
+  // handle student enrollment process
   const handleEnroll = async () => {
     const token = localStorage.getItem('access_token');
     
@@ -82,9 +81,11 @@ export default function CourseDetail() {
       await api.post(`courses/${id}/enroll/`);
       alert("Successfully enrolled! Welcome to the course.");
       setCourse(prev => ({ ...prev, is_enrolled: true }));
-    } catch (err) {
+    } 
+    catch (err) {
       console.error("Enrollment failed:", err);
       const backendError = err.response?.data?.error;
+
       if(backendError){
         alert(backendError);
       }else if (err.response && err.response.status === 403) {
@@ -92,7 +93,8 @@ export default function CourseDetail() {
       } else {
         alert("Enrollment failed. Please try again.");
       }
-    } finally {
+    } 
+    finally {
       setIsEnrolling(false);
     }
   };
@@ -104,12 +106,9 @@ export default function CourseDetail() {
     <div className="min-h-screen bg-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-12">
         
-        {/* ========================================== */}
-        {/* 🌟 极简版头部：左侧图片，右侧信息与报名按钮 */}
-        {/* ========================================== */}
         <div className="flex flex-col md:flex-row gap-8 items-start">
           
-          {/* 左侧：课程封面 */}
+          {/* Course cover image */}
           <div className="w-full md:w-1/2 rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-100 aspect-video">
             {course.image ? (
               <img src={getMediaUrl(course.image)} alt={course.title} className="w-full h-full object-cover" />
@@ -120,7 +119,7 @@ export default function CourseDetail() {
             )}
           </div>
 
-          {/* 右侧：课程信息 */}
+          {/* course content */}
           <div className="w-full md:w-1/2 flex flex-col h-full">
             <Link to="/" className="text-indigo-600 hover:underline text-sm font-semibold mb-4 inline-block">
               &larr; Back to Catalog
@@ -151,10 +150,10 @@ export default function CourseDetail() {
               {course.overview || "No description provided for this course."}
             </p>
 
-            {/* 操作区 (Enroll / Go to Course) */}
+            {/* go to course */}
             <div className="mt-auto pt-6 border-t border-slate-100">
               {(() => {
-                // 1. 如果是管理员
+                // if is admin
                 if (currentUser?.role === 'admin') {
                   return (
                     <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-amber-800 text-sm font-bold text-center">
@@ -165,7 +164,7 @@ export default function CourseDetail() {
 
                 const isOwner = course.owner?.id === currentUser?.id || course.owner?.username === currentUser?.username;
 
-                // 2. 如果是课程创建者 (老师本人)
+                // if is owner
                 if (isOwner) {
                   return (
                     <Link 
@@ -177,7 +176,7 @@ export default function CourseDetail() {
                   );
                 }
 
-                // 3. 如果已经报名
+                // if enrolled
                 if (course.is_enrolled) {
                   return (
                     <button 
@@ -189,7 +188,7 @@ export default function CourseDetail() {
                   );
                 }
 
-                // 4. 普通访客或未报名学生
+                // guest
                 return (
                   <button 
                     onClick={handleEnroll}
@@ -204,9 +203,7 @@ export default function CourseDetail() {
           </div>
         </div>
 
-        {/* ========================================== */}
-        {/* 🌟 极简版大纲 (Syllabus) */}
-        {/* ========================================== */}
+        {/* syllabus */}
         <div>
           <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-200 pb-2">Course Modules</h2>
           
@@ -229,7 +226,7 @@ export default function CourseDetail() {
           <div className="mt-16 pt-12 border-t border-slate-200">
           <div className="flex items-center gap-4 mb-8">
             <h2 className="text-2xl font-extrabold text-slate-900">Student Feedback</h2>
-            {/* 显示平均分 */}
+            {/* show average rating */}
             {course.average_rating > 0 && (
               <div className="flex items-center gap-1 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
                 <span className="text-amber-500 text-lg">★</span>
@@ -240,7 +237,7 @@ export default function CourseDetail() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             
-            {/* 左侧：留下评价的表单 (仅限已报名用户) */}
+            {/* review form */}
             <div className="md:col-span-1">
               {course.is_enrolled ? (
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 sticky top-24">

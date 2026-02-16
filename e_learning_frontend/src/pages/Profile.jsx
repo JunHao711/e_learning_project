@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
@@ -8,68 +9,58 @@ export default function Profile() {
   const [error, setError] = useState('');
   const { username: targetUsername } = useParams();
   const isOwnProfile = !targetUsername;
-  // 状态发布
   const [newStatus, setNewStatus] = useState('');
   const [isPosting, setIsPosting] = useState(false);
-
-  // 资料编辑
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ bio: '' });
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 辅助函数：处理 Django 的媒体路径
-  const getMediaUrl = (path) => {
-    if (!path) return '';
-    if (path.startsWith('http')) return path;
-    return `http://localhost:8000${path}`;
+  // fetch profile data
+  const fetchProfileData = async () => {
+    setIsLoading(true);
+    try {
+      let usernameToFetch = targetUsername;
+
+      // If viewing own profile, check out who "me" is first
+      if (isOwnProfile) {
+          const meRes = await api.get('users/me/');
+          usernameToFetch = meRes.data.username;
+          // Pre-fill the edit form with own bio
+          setEditForm({ bio: meRes.data.bio || '' });
+      }
+
+      // Fetch the public profile data using the determined username
+      const profileRes = await api.get(`users/profile/${usernameToFetch}/`);
+      setProfile(profileRes.data);
+    
+    } catch (err) {
+      setError('User not found or failed to load profile.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-    const fetchProfileData = async () => {
-
-        setIsLoading(true); // 确保每次切换时都有 loading 状态
-        try {
-        let usernameToFetch = targetUsername;
-
-        // If viewing own profile, figure out who "me" is first
-        if (isOwnProfile) {
-            const meRes = await api.get('users/me/');
-            usernameToFetch = meRes.data.username;
-            // Pre-fill the edit form with own bio
-            setEditForm({ bio: meRes.data.bio || '' });
-        }
-
-        // Fetch the public profile data using the determined username
-        const profileRes = await api.get(`users/profile/${usernameToFetch}/`);
-        setProfile(profileRes.data);
-        
-        } catch (err) {
-        setError('User not found or failed to load profile.');
-        console.error(err);
-        } finally {
-        setIsLoading(false);
-        }
-  };
-
-  // 🌟 重要修改：让 useEffect 监听 targetUsername 的变化
+  // trigger when url parameter (targetUsername) changes
   useEffect(() => {
     fetchProfileData();
   }, [targetUsername]);
 
-  useEffect(() => {
-    fetchProfileData();
-  }, []);
-
-  // 🌟 处理发布新状态 (Status Update)
+  // handle post status
   const handlePostStatus = async (e) => {
     e.preventDefault();
+
     if (!newStatus.trim()) return;
+    
     setIsPosting(true);
+
     try {
       await api.post('users/status/', { content: newStatus });
       setNewStatus('');
-      fetchProfileData(); // 重新拉取以刷新状态列表
+      // Refresh the profile data to show the new status immediately
+      fetchProfileData();
     } catch (err) {
       alert('Failed to post status.');
     } finally {
@@ -77,7 +68,7 @@ export default function Profile() {
     }
   };
 
-  // 处理头像选择与预览
+  // Handle local image selection and generate a preview URL
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -86,12 +77,12 @@ export default function Profile() {
     }
   };
 
-  // 🌟 处理保存个人资料 (PATCH 请求 + FormData)
+  // Submit Profile Updates
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setIsSaving(true);
     
-    // 使用 FormData 以支持图片上传
+    // use FormData to handle both text and photo
     const submitData = new FormData();
     submitData.append('bio', editForm.bio);
     if (photoFile) {
@@ -99,15 +90,15 @@ export default function Profile() {
     }
 
     try {
-      // 发送 PATCH 请求做局部更新
+      // Use PATCH for partial updates
       await api.patch('users/me/', submitData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+      // Reset UI states on success
       setIsEditing(false);
       setPhotoFile(null);
       setPhotoPreview(null);
-      fetchProfileData(); // 刷新数据
+      fetchProfileData(); 
     } catch (err) {
       alert('Failed to update profile.');
       console.error(err);
@@ -117,22 +108,19 @@ export default function Profile() {
   };
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center animate-pulse text-indigo-600 font-bold text-xl">Loading Profile...</div>;
+  
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
         
-        {/* ========================================== */}
-        {/* 顶部：个人名片区 (Profile Card) */}
-        {/* ========================================== */}
+        {/* Profile Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
-          {/* 装饰性背景 */}
           <div className="h-32 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-          
           <div className="px-8 pb-8 relative">
             <div className="flex justify-between items-end -mt-12 mb-6">
-              {/* 头像 */}
+              {/* Profile image */}
               <div className="w-24 h-24 rounded-full border-4 border-white bg-slate-200 overflow-hidden shadow-md flex-shrink-0">
                 {profile.photo ? (
                   <img src={getMediaUrl(profile.photo)} alt="Profile" className="w-full h-full object-cover" />
@@ -143,7 +131,7 @@ export default function Profile() {
                 )}
               </div>
               
-              {/* 编辑按钮 */}
+              {/* Edit button */}
               {isOwnProfile && (
                 <button 
                 onClick={() => setIsEditing(true)}
@@ -163,7 +151,7 @@ export default function Profile() {
               )}
             </div>
 
-            {/* 用户基本信息 */}
+            {/* User information */}
             <div>
               <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3">
                 {profile.username}
@@ -183,9 +171,7 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* ========================================== */}
-        {/* 底部：状态更新区 (Status Feed) */}
-        {/* ========================================== */}
+        {/* Status side */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
             <svg className="w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
@@ -242,9 +228,7 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* ========================================== */}
-      {/* 🌟 模态框：编辑资料 (Edit Profile Modal) */}
-      {/* ========================================== */}
+      {/* Edit Profile Modal */}
       {isEditing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
@@ -252,7 +236,7 @@ export default function Profile() {
             
             <form onSubmit={handleSaveProfile} className="space-y-5">
               
-              {/* 头像上传 */}
+              {/* avatar upload */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Profile Photo</label>
                 <div className="flex items-center gap-4">
@@ -276,7 +260,7 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* 简介编辑 */}
+              {/* bio */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Bio (About Me)</label>
                 <textarea 

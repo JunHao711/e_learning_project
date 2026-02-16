@@ -1,5 +1,4 @@
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -17,17 +16,6 @@ import CourseDetail from './pages/CourseDetail';
 import StudentWorkspace from './pages/StudentWorkspace';
 
 function App() {
-  
-  const navigate = useNavigate();
-  const [showLogoutModal,setShowLogoutModal] = useState(false)
-
-  const handleLogout =()=> {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setShowLogoutModal(false);
-    navigate('/login');
-  }
-
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Global navigation */}

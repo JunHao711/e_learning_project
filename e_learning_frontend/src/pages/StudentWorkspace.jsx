@@ -1,23 +1,18 @@
-// src/pages/StudentWorkspace.jsx
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
 
 export default function StudentWorkspace() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
   const [course, setCourse] = useState(null);
-  const [activeContent, setActiveContent] = useState(null);
+  const [activeContent, setActiveContent] = useState(null); // the currently viewed lesson
   const [expandedModuleId, setExpandedModuleId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMarking, setIsMarking] = useState(false);
+  const [isMarking, setIsMarking] = useState(false); // prevents double click
 
-  const getMediaUrl = (path) => {
-    if (!path) return '';
-    return path.startsWith('http') ? path : `http://localhost:8000${path}`;
-  };
-
+  // Fetching course
   useEffect(() => {
     const fetchCourseData = async () => {
       try {
@@ -42,40 +37,42 @@ export default function StudentWorkspace() {
     fetchCourseData();
   }, [id]);
 
-  // 🌟 核心算法：将多层级的课程内容压平为一维数组 (Flattening)
+  // Flatteining the tree
+  // cache this calculation
+  // only reruns when course changes
   const flatContents = useMemo(() => {
     if (!course?.modules) return [];
     let contents = [];
     course.modules.forEach(mod => {
+      // sort content by their order
       const sorted = [...(mod.contents || [])].sort((a, b) => a.order - b.order);
       sorted.forEach(c => contents.push({ ...c, moduleId: mod.id }));
     });
     return contents;
   }, [course]);
 
-  // 计算当前课程在所有课程中的索引
+  // determine for "Previous" and "Next" buttons
   const currentIndex = activeContent ? flatContents.findIndex(c => c.id === activeContent.id) : -1;
   const prevContent = currentIndex > 0 ? flatContents[currentIndex - 1] : null;
   const nextContent = currentIndex >= 0 && currentIndex < flatContents.length - 1 ? flatContents[currentIndex + 1] : null;
 
-  // 🌟 计算总体进度百分比 (Progress Bar Calculation)
+  // Progress Bar Calculation
   const progressPercentage = useMemo(() => {
     if (flatContents.length === 0) return 0;
     const completedCount = flatContents.filter(c => c.is_completed).length;
     return Math.round((completedCount / flatContents.length) * 100);
   }, [flatContents]);
 
-  // 🌟 处理完成并进入下一节 (Mark Complete & Continue)
+  // Mark Complete & Continue
   const handleCompleteAndContinue = async () => {
     if (!activeContent) return;
     setIsMarking(true);
 
     try {
-      // 1. 调用后端 API 打卡
+      // call to register completion
       if (!activeContent.is_completed) {
         await api.post(`courses/content/${activeContent.id}/mark-complete/`);
-        
-        // 2. 🌟 严格遵循 React 的不可变(Immutable)原则更新状态
+
         setCourse(prev => {
           const newCourse = { ...prev };
           newCourse.modules = newCourse.modules.map(mod => {
@@ -87,21 +84,20 @@ export default function StudentWorkspace() {
                 )
               };
             }
-            return mod;
+            return mod; // Return other modules untouched
           });
           return newCourse;
         });
       }
 
-      // 3. 导航到下一节，或者庆祝完课
+      // Navigate to next content
       if (nextContent) {
         setActiveContent(nextContent);
-        setExpandedModuleId(nextContent.moduleId); // 自动展开下一个模块的文件夹
+        setExpandedModuleId(nextContent.moduleId);
       } else {
-        // 🌟 核心修复：延迟 300 毫秒弹出！
-        // 让 React 有足够的时间把进度条拉到 100%，并画出最后一个绿色勾勾 ✅
+        // 300ms delay ensures the UI progress bar reaches 100% before the alert blocks the main thread
         setTimeout(() => {
-          alert("🎉 Congratulations! You have completed the entire course!");
+          alert("Congratulations! You have completed the entire course!");
         }, 300);
       }
     } catch (err) {
@@ -118,9 +114,7 @@ export default function StudentWorkspace() {
   return (
     <div className="h-[calc(100vh-64px)] bg-slate-50 flex overflow-hidden">
       
-      {/* ========================================== */}
-      {/* Sidebar: Curriculum */}
-      {/* ========================================== */}
+      {/* Curriculum */}
       <div className="w-80 bg-white border-r border-slate-200 flex flex-col h-full z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)] flex-shrink-0">
         
         <div className="p-5 border-b border-slate-200 bg-slate-50">
@@ -131,7 +125,7 @@ export default function StudentWorkspace() {
             {course.title}
           </h2>
           
-          {/* 🌟 真实的进度条 (Live Progress Bar) */}
+          {/* Progress Bar */}
           <div>
             <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
               <span>Course Progress</span>
@@ -177,7 +171,7 @@ export default function StudentWorkspace() {
                                 isActive ? 'bg-indigo-50 border-indigo-600' : 'hover:bg-slate-100 border-transparent'
                               }`}
                             >
-                              {/* 🌟 动态图标：如果完成了，显示绿色勾勾 */}
+                              {/* 🌟 if completed, show green tick */}
                               <div className="mt-0.5 relative">
                                 <span className={`text-lg ${isActive ? 'opacity-100' : 'opacity-60'}`}>
                                   {content.item.type === 'video' ? '📺' : content.item.type === 'text' ? '📝' : content.item.type === 'file' ? '📁' : '🖼️'}
@@ -209,9 +203,7 @@ export default function StudentWorkspace() {
         </div>
       </div>
 
-      {/* ========================================== */}
-      {/* Main Screen: Renderer & Navigation */}
-      {/* ========================================== */}
+      {/* Main Screen */}
       <div className="flex-1 flex flex-col h-full bg-white relative">
         <div className="h-16 border-b border-slate-200 flex items-center justify-between px-8 bg-white z-10 flex-shrink-0">
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-3">
@@ -253,7 +245,7 @@ export default function StudentWorkspace() {
               </div>
             )}
 
-            {/* 🌟 智能底部导航栏 (Smart Navigation) */}
+            {/* Navigate back to previous or next */}
             {activeContent && (
               <div className="mt-8 flex justify-between items-center pb-12">
                 {prevContent ? (
@@ -277,7 +269,7 @@ export default function StudentWorkspace() {
                   {isMarking 
                     ? 'Saving...' 
                     : !nextContent && activeContent.is_completed 
-                      ? 'Course Completed ✅' 
+                      ? 'Course Completed' 
                       : 'Complete & Continue \u2192'}
                 </button>
               </div>

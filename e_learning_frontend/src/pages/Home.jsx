@@ -1,24 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
 
 export default function Home() {
+  // store course list
   const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Format Django media URLs
-  const getMediaUrl = (path) => {
-    if (!path) return '';
-    return path.startsWith('http') ? path : `http://localhost:8000${path}`;
-  };
 
   useEffect(() => {
     const fetchCourses = async () => {
       try {
         const response = await api.get('courses/'); 
         const data = response.data.results || response.data;
-        // Verify we got an array, otherwise fallback to empty array
         setCourses(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Failed to load courses:", err);
@@ -38,7 +33,7 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* Simple Header & Search */}
+        {/* header and search */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">Course Catalog</h1>
@@ -56,7 +51,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Content Area */}
+        {/* content area */}
         {isLoading ? (
           <div className="text-center text-indigo-600 font-semibold py-20 animate-pulse">
             Loading courses...
@@ -73,7 +68,7 @@ export default function Home() {
                 key={course.id}
                 className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-indigo-300 transition-all cursor-pointer flex flex-col"
               >
-                {/* Course Image */}
+                {/* course image */}
                 <div className="aspect-video bg-slate-100 border-b border-slate-100">
                   {course.image ? (
                     <img src={getMediaUrl(course.image)} alt={course.title} className="w-full h-full object-cover" />
@@ -84,7 +79,7 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Course Info */}
+                {/* course info */}
                 <div className="p-5 flex-1 flex flex-col">
                   <span className="text-xs font-bold text-indigo-600 uppercase mb-1">
                     {course.subject || 'General'}
