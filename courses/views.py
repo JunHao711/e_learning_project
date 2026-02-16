@@ -6,13 +6,14 @@ from django.db.models import Count
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from users.api_permissions import IsSiteAdminAPI
-from .models import Course, Module, Content, Subject
+from .models import Course, Module, Content, Subject, CourseReview
 from .serializers import SubjectSerializer, CourseListSerializer, CourseDetailSerializer, TeacherCourseSerializer, ModuleSerializer, CourseStudentSerializer, AdminCourseSerializer
 from django_filters.rest_framework import DjangoFilterBackend
+from users.models import Notification
 
 User = get_user_model()
 
-class SubjectViewSet(viewsets.ReadOnlyModelViewSet):
+class SubjectViewSet(viewsets.ModelViewSet):
     """
     GET /api/courses/subjects/
     API endpoint that allows subjects (categories) to be viewed.
@@ -21,6 +22,11 @@ class SubjectViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Subject.objects.annotate(total_courses=Count('courses'))
     serializer_class = SubjectSerializer
     permission_classes = [permissions.AllowAny]
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [permissions.AllowAny()]
+        return [IsSiteAdminAPI()] 
 
 class PublicCourseListAPIView(generics.ListAPIView):
     """
@@ -63,7 +69,6 @@ class TeacherCourseListCreateAPIView(generics.ListCreateAPIView):
         return Course.objects.filter(owner=self.request.user)
 
     def perform_create(self, serializer):
-        # 强制将课程的创建者设为当前登录的老师
         serializer.save(owner=self.request.user)
 
 class TeacherCourseRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
@@ -119,6 +124,20 @@ class TeacherContentCreateAPIView(APIView):
             
         item_instance = model_class.objects.create(**item_data)
         Content.objects.create(module=module, item=item_instance)
+
+        course = module.course
+        students = course.students.all()
+        if students.exists():
+            notifications = [
+                Notification(
+                    recipient=student,
+                    title="📚 New Course Material!",
+                    message=f"Teacher {request.user.username} just added a new {model_name} to '{course.title}'.",
+                    link=f"/student/course/{course.id}" # 直接引导学生去沉浸式播放器
+                )
+                for student in students
+            ]
+            Notification.objects.bulk_create(notifications)
         
         return Response({"message": f"{model_name.capitalize()} content added successfully."}, status=status.HTTP_201_CREATED)
 
@@ -134,6 +153,14 @@ class TeacherContentDeleteAPIView(APIView):
         content.item.delete()
         content.delete()
         return Response({"message": "Content deleted."}, status=status.HTTP_204_NO_CONTENT)
+    
+    def patch(self,request,id):
+        content = get_object_or_404(Content, id=id, module__course__owner=request.user)
+        if 'order' in request.data:
+            content.order = request.data['order']
+            content.save()
+            return Response({"message": "Order updated."}, status=status.HTTP_200_OK)
+        return Response({"error": "Order field required."}, status=status.HTTP_400_BAD_REQUEST)
 
 class TeacherStudentListAPIView(generics.ListAPIView):
     """
@@ -205,3 +232,95 @@ class AdminCourseDeleteAPIView(APIView):
         title = course.title
         course.delete()
         return Response({"message": f"Course '{title}' forcefully deleted by Admin."}, status=status.HTTP_204_NO_CONTENT)
+    
+class CourseEnrollAPIView(APIView):
+    """
+    POST /api/courses/<course_id>/enroll/
+    Handles student enrollment and triggers a notification to the teacher.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+
+        if course.owner == request.user:
+            return Response(
+                {"error": "As the instructor, you are already the manager of this course and cannot enroll as a student."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if user is in the blocklist
+        if request.user in course.blocked_students.all():
+            return Response({"error": "You are blocked from enrolling in this course."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Check if already enrolled
+        if request.user in course.students.all():
+            return Response({"message": "You are already enrolled."}, status=status.HTTP_200_OK)
+
+        # Enroll the student
+        course.students.add(request.user)
+
+        # Trigger Notification to the Teacher
+        # Only notify if the person enrolling is not the owner themselves
+        if request.user != course.owner:
+            Notification.objects.create(
+                recipient=course.owner,
+                title="New Student Enrollment!",
+                message=f"{request.user.username} has just enrolled in your course '{course.title}'.",
+                link=f"/courses/{course.id}/students"
+            )
+
+        return Response({"message": "Successfully enrolled!"}, status=status.HTTP_200_OK)
+    
+class MarkContentCompleteAPIView(APIView):
+    """
+    POST /api/courses/content/<int:content_id>/mark-complete/
+    Marks a specific content item as completed for the current user.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, content_id):
+        content = get_object_or_404(Content, id=content_id)
+        content.completed_users.add(request.user)
+        return Response({"message": "Content marked as completed."}, status=status.HTTP_200_OK)
+
+class CourseReviewCreateAPIView(APIView):
+    """
+    POST /api/courses/<course_id>/review/
+    Allows an enrolled student to leave or update a review.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        
+        # Check if the user is enrolled
+        if request.user not in course.students.all():
+            return Response({"error": "You must be enrolled to leave a review."}, status=status.HTTP_403_FORBIDDEN)
+
+        rating = request.data.get('rating')
+        comment = request.data.get('comment', '')
+
+        if not rating or not str(rating).isdigit() or not (1 <= int(rating) <= 5):
+            return Response({"error": "Please provide a valid rating between 1 and 5."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update or Create the review
+        review, created = CourseReview.objects.update_or_create(
+            course=course,
+            student=request.user,
+            defaults={'rating': int(rating), 'comment': comment}
+        )
+
+        message = "Review submitted successfully!" if created else "Review updated successfully!"
+        return Response({"message": message}, status=status.HTTP_200_OK)
+
+class StudentEnrolledCoursesAPIView(generics.ListAPIView):
+    """
+    GET /api/courses/enrolled/
+    Retrieves all courses the current student has enrolled in.
+    """
+    serializer_class = CourseListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Course.objects.filter(students=self.request.user).distinct().order_by('-created')

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Subject, Course, Module, Content, Text, File, Image, Video
+from .models import Subject, Course, Module, Content, Text, File, Image, Video, CourseReview
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -37,10 +37,11 @@ class ContentSerializer(serializers.ModelSerializer):
     (Text, Video, Image, File) and serializes it.
     """
     item = serializers.SerializerMethodField()
+    is_completed = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
-        fields = ['id', 'order', 'content_type', 'object_id', 'item']
+        fields = ['id', 'order', 'content_type', 'object_id', 'item','is_completed']
 
     def get_item(self, obj):
         """
@@ -55,6 +56,12 @@ class ContentSerializer(serializers.ModelSerializer):
         if isinstance(obj.item, Image):
             return {"type": "image", **ImageSerializer(obj.item).data}
         return None
+    
+    def get_is_completed(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return request.user in obj.completed_users.all()
+        return False
     
 class ModuleSerializer(serializers.ModelSerializer):
     contents = ContentSerializer(many=True, read_only=True)
@@ -75,7 +82,15 @@ class CourseListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ['id', 'subject', 'title', 'slug', 'course_code', 'overview', 'created', 'owner', 'total_modules']
+        fields = ['id', 'subject', 'title', 'slug', 'course_code', 'overview', 'created', 'owner', 'total_modules','image']
+
+class CourseReviewSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.username', read_only=True)
+    student_photo = serializers.ImageField(source='student.photo', read_only=True)
+
+    class Meta:
+        model = CourseReview
+        fields = ['id', 'student_name', 'student_photo', 'rating', 'comment', 'created']
 
 class CourseDetailSerializer(serializers.ModelSerializer):
     """
@@ -85,11 +100,12 @@ class CourseDetailSerializer(serializers.ModelSerializer):
     subject = serializers.StringRelatedField()
     modules = ModuleSerializer(many=True, read_only=True)
     is_enrolled = serializers.SerializerMethodField()
-
+    reviews = CourseReviewSerializer(many=True, read_only=True)
+    average_rating = serializers.FloatField(read_only=True)
     class Meta:
         model = Course
         fields = ['id', 'subject', 'title', 'slug', 'course_code', 'overview', 
-                  'created', 'owner', 'modules', 'is_enrolled']
+                  'created', 'owner', 'modules', 'is_enrolled','image','reviews', 'average_rating']
         
     def get_is_enrolled(self, obj):
         request = self.context.get('request')
@@ -103,7 +119,7 @@ class TeacherCourseSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = Course
-        fields = ['id', 'subject', 'title', 'slug', 'course_code', 'overview', 'co_instructors']
+        fields = ['id', 'subject', 'title', 'slug', 'course_code', 'overview', 'co_instructors','image']
 
 class CourseStudentSerializer(serializers.ModelSerializer):
     """
@@ -111,7 +127,7 @@ class CourseStudentSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'date_joined']
+        fields = ['id', 'username', 'email', 'date_joined','role','photo']
 
 class AdminCourseSerializer(serializers.ModelSerializer):
     """
@@ -123,3 +139,4 @@ class AdminCourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
         fields = ['id', 'course_code', 'title', 'subject_name', 'owner_name', 'student_count', 'created']
+

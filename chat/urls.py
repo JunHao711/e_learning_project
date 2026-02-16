@@ -5,7 +5,7 @@ app_name = 'chat'
 
 urlpatterns = [
     # course room history
-    path('room/<int:course_id>/history/', views.CourseChatHistoryAPIView.as_view(), name='api_course_chat_history'),
+    path('courses/<int:course_id>/history/', views.CourseChatHistoryAPIView.as_view(), name='api_course_chat_history'),
     # private chat room and name
     path('private/<int:target_user_id>/history/', views.PrivateChatHistoryAPIView.as_view(), name='api_private_chat_history'),
     # file or image upload

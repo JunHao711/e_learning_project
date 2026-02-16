@@ -26,7 +26,7 @@ class CourseChatHistoryAPIView(generics.ListAPIView):
         course = get_object_or_404(Course, id=self.kwargs['course_id'])
         
         # only enrolled students or course teacher can see the course chat
-        if self.request.user not in course.students.all() and self.request.user != course.owner:
+        if self.request.user not in course.students.all() and self.request.user.id != course.owner.id:
             raise PermissionDenied("You do not have access to this course's chat.")
             
         return course.chat_messages.all().order_by('-timestamp')[:50]

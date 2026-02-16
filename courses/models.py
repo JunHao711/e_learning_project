@@ -43,6 +43,7 @@ class Course(models.Model):
     course_code = models.CharField(max_length=20,unique=True,default='TEMP001')
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, blank=True)
+    image = models.ImageField(upload_to='course_images/', blank=True, null=True)
     overview = models.TextField()
     created = models.DateTimeField(auto_now_add=True)
 
@@ -112,6 +113,8 @@ class Content(models.Model):
 
     order = models.PositiveIntegerField(default=0)
 
+    # track who complete this content
+    completed_users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='completed_contents', blank=True)
     class Meta:
         ordering = ['order']
 
@@ -146,7 +149,7 @@ class CourseReview(models.Model):
     updated = models.DateTimeField(auto_now=True)
 
     class Meta:
-        # Constraint: A student can only review a course once
+        # a student can only review a course once
         unique_together = ['course', 'student'] 
         ordering = ['-created'] # Show newest reviews first
 

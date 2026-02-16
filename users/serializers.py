@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from django.contrib.auth.hashers import make_password
 from .models import CustomUser, ProfileStatus, Notification
 
 class ProfileStatusSerializer(serializers.ModelSerializer):
@@ -28,7 +27,13 @@ class UserEditSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'bio', 'photo']
+        fields = ['username', 'email', 'bio', 'photo','role']
+        read_only_fields = ['id','role']
+
+    def get_role(self, obj):
+        if obj.is_superuser or obj.is_staff:
+            return 'admin'
+        return obj.role
 
 class ChangePasswordSerializer(serializers.Serializer):
     """

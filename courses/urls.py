@@ -8,7 +8,7 @@ router = DefaultRouter()
 router.register(r'subjects', views.SubjectViewSet, basename='subject')
 
 urlpatterns = [
-    path('', include(router.urls)),
+    
     # public course list endpoint
     path('', views.PublicCourseListAPIView.as_view(), name='api_public_course_list'),
     path('<int:pk>/', views.PublicCourseDetailAPIView.as_view(), name='api_public_course_detail'),
@@ -20,11 +20,17 @@ urlpatterns = [
     # create and delete course content
     path('teacher/modules/<int:module_id>/content/<str:model_name>/', views.TeacherContentCreateAPIView.as_view(), name='api_teacher_content_create'),
     path('teacher/content/<int:id>/', views.TeacherContentDeleteAPIView.as_view(), name='api_teacher_content_delete'),
+    path('<int:course_id>/enroll/', views.CourseEnrollAPIView.as_view(), name='api_course_enroll'),
+    path('<int:course_id>/review/', views.CourseReviewCreateAPIView.as_view(), name='api_course_review'),
     # teacher student management url
     path('teacher/<int:course_pk>/students/', views.TeacherStudentListAPIView.as_view(), name='api_teacher_student_list'),
     path('teacher/<int:course_id>/students/<int:student_id>/block/', views.TeacherStudentKickBlockAPIView.as_view(), name='api_teacher_student_block'),
     path('teacher/<int:course_id>/students/<int:student_id>/unblock/', views.TeacherStudentUnblockAPIView.as_view(), name='api_teacher_student_unblock'),
+    path('content/<int:content_id>/mark-complete/', views.MarkContentCompleteAPIView.as_view(), name='api_mark_content_complete'),
     # admin urls
     path('admin/all/', views.AdminCourseListAPIView.as_view(), name='api_admin_course_list'),
     path('admin/<int:course_id>/', views.AdminCourseDeleteAPIView.as_view(), name='api_admin_course_delete'),
+    path('enrolled/', views.StudentEnrolledCoursesAPIView.as_view(), name='api_student_enrolled_courses'),
+
+    path('', include(router.urls)),
 ]

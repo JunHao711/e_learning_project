@@ -4,9 +4,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import CustomUser, Notification
-from courses.models import Course, CourseReview
+from courses.models import Course
 from .api_permissions import IsSiteAdminAPI
 from .serializers import ProfileStatusSerializer, UserProfileSerializer, UserRegistrationSerializer, UserEditSerializer,AdminUserSerializer,NotificationSerializer, ChangePasswordSerializer
+from django.contrib.auth import get_user_model
+from django.db.models import Count
+
+User = get_user_model()
 
 class UserSearchAPIView(generics.ListAPIView):
     """
@@ -75,12 +79,17 @@ class AdminDashboardAPIView(APIView):
     permission_classes = [IsSiteAdminAPI]
 
     def get(self, request):
-        stats = {
-            'total_students': CustomUser.objects.filter(role='student').count(),
-            'total_teachers': CustomUser.objects.filter(role='teacher').count(),
-            'total_courses': Course.objects.count(),
-        }
-        return Response(stats, status=status.HTTP_200_OK)
+        total_users = User.objects.count()
+        total_courses = Course.objects.count()
+        
+        enrollments_data = Course.objects.aggregate(total=Count('students'))
+        total_enrollments = enrollments_data['total'] or 0
+
+        return Response({
+            "total_users": total_users,
+            "total_courses": total_courses,
+            "total_enrollments": total_enrollments
+        }, status=status.HTTP_200_OK)
 
 class AdminUserListAPIView(generics.ListAPIView):
     """
@@ -91,7 +100,7 @@ class AdminUserListAPIView(generics.ListAPIView):
     permission_classes = [IsSiteAdminAPI]
 
     def get_queryset(self):
-        return CustomUser.objects.exclude(id=self.request.user.id).order_by('-date_joined')
+        return User.objects.exclude(id=self.request.user.id).order_by('-date_joined')
 
 class AdminUserToggleAPIView(APIView):
     """
@@ -101,22 +110,16 @@ class AdminUserToggleAPIView(APIView):
     permission_classes = [IsSiteAdminAPI]
 
     def post(self, request, user_id):
-        user_to_toggle = get_object_or_404(CustomUser, id=user_id)
+        target_user = get_object_or_404(User, id=user_id)
         
-        if user_to_toggle == request.user:
-            return Response(
-                {"error": "Security constraint: You cannot deactivate your own account."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if target_user == request.user:
+            return Response({"error": "You cannot ban yourself."}, status=status.HTTP_400_BAD_REQUEST)
             
-        user_to_toggle.is_active = not user_to_toggle.is_active
-        user_to_toggle.save()
+        target_user.is_active = not target_user.is_active
+        target_user.save()
         
-        action = "activated" if user_to_toggle.is_active else "deactivated"
-        return Response({
-            "message": f"User '{user_to_toggle.username}' has been successfully {action}.",
-            "is_active": user_to_toggle.is_active
-        }, status=status.HTTP_200_OK)
+        action = "activated" if target_user.is_active else "banned"
+        return Response({"message": f"User {target_user.username} has been {action}."}, status=status.HTTP_200_OK)
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     """

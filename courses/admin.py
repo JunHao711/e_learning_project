@@ -16,12 +16,12 @@ class ModuleInline(admin.StackedInline):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ['title', 'course_code', 'subject', 'owner', 'created'] # 增加了 course_code 和 owner 展示 [cite: 4, 6]
+    list_display = ['title', 'course_code', 'subject', 'owner', 'created'] 
     list_filter = ['created', 'subject']
     search_fields = ['title', 'overview', 'course_code']
     prepopulated_fields = {'slug': ('title',)}
     inlines = [ModuleInline]
-    filter_horizontal = ('co_instructors', 'blocked_students') # 加入了 blocked_students 方便管理员操作 [cite: 6]
+    filter_horizontal = ('co_instructors', 'blocked_students') 
 
 @admin.register(CourseReview)
 class CourseReviewAdmin(admin.ModelAdmin):
@@ -29,10 +29,12 @@ class CourseReviewAdmin(admin.ModelAdmin):
     list_filter = ['rating', 'created']
     search_fields = ['course__title', 'student__username', 'comment']
 
-# 注册多态内容
+@admin.register(Content)
+class ContentAdmin(admin.ModelAdmin):
+    list_display = ['module', 'content_type', 'object_id', 'item','order']
+
 admin.site.register(Text)
 admin.site.register(File)
 admin.site.register(Image)
 admin.site.register(Video)
-admin.site.register(Content)
     
