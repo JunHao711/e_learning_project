@@ -6,9 +6,10 @@ from rest_framework.decorators import action
 from .models import CustomUser, Notification
 from courses.models import Course
 from .api_permissions import IsSiteAdminAPI
-from .serializers import ProfileStatusSerializer, UserProfileSerializer, UserRegistrationSerializer, UserEditSerializer,AdminUserSerializer,NotificationSerializer, ChangePasswordSerializer
+from .serializers import ProfileStatusSerializer, CustomTokenObtainPairSerializer,UserProfileSerializer, UserRegistrationSerializer, UserEditSerializer,AdminUserSerializer,NotificationSerializer, ChangePasswordSerializer
 from django.contrib.auth import get_user_model
 from django.db.models import Count
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 User = get_user_model()
 
@@ -179,3 +180,6 @@ class ChangePasswordAPIView(generics.UpdateAPIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer

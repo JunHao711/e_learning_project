@@ -36,7 +36,7 @@ class CourseHypothesisTests(HypothesisTestCase):
             # If it magically passes validation (meaning strings fit inside model MaxLength),
             # the validated data should accurately reflect the input.
             if is_valid:
-                self.assertEqual(serializer.validated_data['title'], rand_title)
+                self.assertEqual(serializer.validated_data['title'], rand_title.strip())
                 
         except Exception as e:
             self.fail(f"Server crashed (500 Error) under fuzzing load in TeacherCourseSerializer: {e}")

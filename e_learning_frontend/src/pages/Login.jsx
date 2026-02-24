@@ -31,16 +31,18 @@ export default function Login() {
     } catch (err) {
       // Handle invalid credentials or server errors
       if (err.response && err.response.status === 401) {
+
         const errorDetail = err.response?.data?.detail || "";
-        if (errorDetail.includes("No active account")) {
+        if (errorDetail === "ACCOUNT_BANNED") {
           // if is_active=False, return this message
           setError("Your account has been banned. Please contact admin");
-        } else if (err.response?.status === 401) {
-          setError("Invalid username or password. Try again");
         } else {
-          setError("The server down. Please try again later.");
+          setError("Invalid username or password. Try again");
         }
-      } 
+
+      } else {
+        setError("The server is down. Please try again later.");
+      }
     } finally {
       setIsLoading(false);
     }

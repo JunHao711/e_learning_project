@@ -28,11 +28,10 @@ export default function CourseBuilder() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 🌟 核心修复器：确保媒体路径强制指向 Django 的 8000 端口
   const getMediaUrl = (path) => {
     if (!path) return '';
-    if (path.startsWith('http')) return path; // 如果已经是绝对路径，直接用
-    return `http://localhost:8000${path}`; // 如果是相对路径，拼上 Django 的地址
+    if (path.startsWith('http')) return path; 
+    return `http://localhost:8000${path}`;
   };
 
   useEffect(() => {
@@ -69,17 +68,15 @@ export default function CourseBuilder() {
       formData.append('course_code', courseForm.course_code);
       formData.append('overview', courseForm.overview);
       
-      // 只有当老师真的选了新图片时，才传 file
       if (courseImageFile) {
         formData.append('image', courseImageFile);
       }
 
-      // 注意这里用 PATCH 而不是 PUT，因为我们可能只更新部分字段
       const res = await api.patch(`courses/teacher/${id}/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
-      setCourse(res.data); // 瞬间刷新页面上的课程标题
+      setCourse(res.data); 
       setShowSettingsModal(false);
       setCourseImageFile(null);
       alert("Course updated successfully!");
@@ -91,9 +88,8 @@ export default function CourseBuilder() {
     }
   };
 
-  // 🌟 新增：彻底删除课程
   const handleDeleteCourse = async () => {
-    const confirmName = window.prompt(`🚨 DANGER ZONE 🚨\n\nThis will permanently delete ALL modules, contents, and student records for this course.\n\nType the course name "${course.title}" to confirm:`);
+    const confirmName = window.prompt(`DANGER ZONE \n\nThis will permanently delete ALL modules, contents, and student records for this course.\n\nType the course name "${course.title}" to confirm:`);
     
     if (confirmName !== course.title) {
       if (confirmName !== null) alert("Course name did not match. Deletion cancelled.");
@@ -103,21 +99,18 @@ export default function CourseBuilder() {
     try {
       await api.delete(`courses/teacher/${id}/`);
       alert("Course permanently deleted.");
-      navigate('/dashboard'); // 删完立刻逃离案发现场，回到 Dashboard
+      navigate('/dashboard');
     } catch (err) {
       alert("Failed to delete course.");
     }
   };
 
   const handleDeleteModule = async (moduleId, moduleTitle) => {
-    if (!window.confirm(`🚨 DANGER ZONE 🚨\n\nAre you sure you want to delete "${moduleTitle}"?\nAll contents inside this module will be permanently lost.`)) return;
+    if (!window.confirm(`DANGER ZONE \n\nAre you sure you want to delete "${moduleTitle}"?\nAll contents inside this module will be permanently lost.`)) return;
 
     try {
-      // 调用后端删除接口
       await api.delete(`courses/teacher/modules/${moduleId}/`);
-      
-      // 🌟 核心修复：直接过滤独立的 modules 状态数组
-      setModules(prevModules => prevModules.filter(m => m.id !== moduleId));
+            setModules(prevModules => prevModules.filter(m => m.id !== moduleId));
       
     } catch (err) {
       console.error("Failed to delete module:", err);
@@ -219,14 +212,9 @@ export default function CourseBuilder() {
               <div className="space-y-4">
                 {modules.map((module, index) => (
                   <div key={module.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                    
-                    {/* 🌟 修复点 1: 修改了 items-center 为 items-start，并加上 gap-4 防粘连 */}
                     <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-start gap-4">
-                      
-                      {/* 🌟 修复点 2: 最重要的一步，加上 flex-1 和 min-w-0，防止文字撑爆屏幕 */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-1">
-                          {/* 加了 flex-shrink-0 防止数字序号变扁 */}
                           <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm">
                             {index + 1}
                           </span>
@@ -239,7 +227,6 @@ export default function CourseBuilder() {
                         )}
                       </div>
 
-                      {/* 🌟 修复点 3: 确保按钮区域绝对不被挤压 (你原来写了 flex-shrink-0，这很好，保持不变) */}
                       <div className="flex items-center gap-2 flex-shrink-0 mt-1">
                         <button 
                           onClick={() => handleDeleteModule(module.id, module.title)}
@@ -260,7 +247,6 @@ export default function CourseBuilder() {
                       </div>
                     </div>
                     
-                    {/* 👇 下方的课件列表渲染部分保持你原来的代码不变 👇 */}
                     <div className="p-4 bg-white">
                       {(!module.contents || module.contents.length === 0) ? (
                         <p className="text-center text-sm text-slate-400 italic py-2">No content uploaded yet.</p>
@@ -268,8 +254,7 @@ export default function CourseBuilder() {
                         <ul className="space-y-3">
                           {[...module.contents].sort((a, b) => a.order - b.order).map((item, i) => (
                             <li key={item.id} className="group flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-indigo-300 transition-all">
-                              <span className="text-2xl">{item.item.type === 'video' ? '📺' : item.item.type === 'text' ? '📝' : item.item.type === 'file' ? '📁' : '🖼️'}</span>
-                              <div className="flex-1 min-w-0"> {/* 这里也加上 min-w-0 防止文件名过长撑爆 */}
+                              <div className="flex-1 min-w-0"> 
                                 <h4 className="text-sm font-bold text-slate-800 truncate">{item.item.title}</h4>
                                 <span className="text-[10px] uppercase font-bold text-slate-400">{item.item.type}</span>
                               </div>
@@ -297,7 +282,7 @@ export default function CourseBuilder() {
             onClick={() => setShowSettingsModal(true)}
             className="flex items-center gap-2 px-5 py-2.5 mb-8 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl shadow-sm transition-all cursor-pointer"
           >
-            ⚙️ Course Settings
+            Course Settings
           </button>
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-6">
               <h3 className="text-lg font-bold text-slate-800 mb-4">Add New Module</h3>
@@ -311,7 +296,6 @@ export default function CourseBuilder() {
         </div>
       </div>
 
-      {/* 🌟 沉浸式预览模态框 (包含图片和文件的终极修复) */}
       {previewItem && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -475,7 +459,7 @@ export default function CourseBuilder() {
                 </div>
               </form>
 
-              {/* 危险区 */}
+              {/* Danger Zone */}
               <div className="mt-8 pt-6 border-t border-rose-100">
                 <h4 className="text-sm font-bold text-rose-600 mb-2">Danger Zone</h4>
                 <p className="text-xs text-slate-500 mb-3">Once you delete a course, there is no going back. Please be certain.</p>
@@ -485,7 +469,6 @@ export default function CourseBuilder() {
               </div>
             </div>
 
-            {/* 底部保存按钮 */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 rounded-b-2xl flex justify-end gap-3">
               <button type="button" onClick={() => setShowSettingsModal(false)} className="px-6 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer">Cancel</button>
               <button type="submit" form="course-settings-form" disabled={isUpdatingCourse} className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold rounded-xl shadow-md transition-colors cursor-pointer">

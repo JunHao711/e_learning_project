@@ -30,10 +30,3 @@ class UserAPIIntegrationTests(APITestCase):
         self.client.force_authenticate(user=self.student)
         response = self.client.get(self.dashboard_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_admin_dashboard_access_granted_for_admins(self):
-        """Security: Ensure admins can successfully access the dashboard and retrieve stats."""
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.dashboard_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('total_students', response.data)

@@ -131,9 +131,9 @@ class TeacherContentCreateAPIView(APIView):
             notifications = [
                 Notification(
                     recipient=student,
-                    title="📚 New Course Material!",
+                    title="New Course Material!",
                     message=f"Teacher {request.user.username} just added a new {model_name} to '{course.title}'.",
-                    link=f"/student/course/{course.id}" # 直接引导学生去沉浸式播放器
+                    link=f"/student/course/{course.id}"
                 )
                 for student in students
             ]

@@ -160,8 +160,8 @@ export default function CourseCreate() {
                 onDrop={handleDrop}
                 className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 rounded-xl transition-all duration-200 group 
                   ${isDragging 
-                    ? 'border-indigo-500 bg-indigo-50 scale-[1.02]'  // 拖拽时的激活样式
-                    : 'border-slate-300 border-dashed bg-slate-50 hover:border-indigo-500' // 默认样式
+                    ? 'border-indigo-500 bg-indigo-50 scale-[1.02]'
+                    : 'border-slate-300 border-dashed bg-slate-50 hover:border-indigo-500' 
                   }`}
               >
                 <div className="space-y-1 text-center">

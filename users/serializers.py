@@ -1,5 +1,10 @@
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from .models import CustomUser, ProfileStatus, Notification
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class ProfileStatusSerializer(serializers.ModelSerializer):
     """Serializer for user status updates."""
@@ -86,6 +91,28 @@ class AdminUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['id', 'username', 'email', 'role', 'is_active', 'date_joined']
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        # get user
+        user = self.get_user_by_username(attrs.get('username'))
+        
+        # if user credentials correct but is_active = false
+        if user and user.check_password(attrs.get('password')) and not user.is_active:
+            raise AuthenticationFailed("ACCOUNT_BANNED", code='authorization')
+
+        # if credentials incorrect
+        try:
+            data = super().validate(attrs)
+            return data
+        except AuthenticationFailed:
+            raise AuthenticationFailed("INVALID_CREDENTIALS", code='authorization')
+
+    def get_user_by_username(self, username):
+        try:
+            return User.objects.get(username=username)
+        except User.DoesNotExist:
+            return None
 
 class NotificationSerializer(serializers.ModelSerializer):
     '''serializer for user notification'''

@@ -4,6 +4,8 @@ from urllib.parse import unquote
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.utils import timezone
+from django.contrib.auth import get_user_model
+from chat.models import PrivateMessage
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +91,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         msg.save()
         return msg
 
-
 class PrivateChatConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer for secure, 1-on-1 private messaging between two users
@@ -143,8 +144,7 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def save_private_message(self, sender, target_id, message, file_url):
-        from django.contrib.auth import get_user_model
-        from chat.models import PrivateMessage
+
         
         User = get_user_model()
         target = User.objects.get(id=target_id)
