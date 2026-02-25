@@ -10,3 +10,5 @@ drf-spectacular>=0.26.4
 djangorestframework-simplejwt>=5.3.0
 factory-boy>=3.3.0
 hypothesis>=6.82.0
+celery
+redis

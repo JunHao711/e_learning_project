@@ -38,6 +38,8 @@ SECURE_REFERRER_POLICY = 'no-referrer-when-downgrade'
 # Allow your site to be embedded if needed (good practice for iframes)
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
+# use Docker REDIS_URL, if not found, use local redis address
+redis_url = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/1')
 
 # Application definition
 
@@ -193,7 +195,7 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
+            "hosts": [redis_url],
         },
     },
 }
