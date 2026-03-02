@@ -22,22 +22,21 @@ export default function CourseChat() {
   // Auto-scroll ref
   const messagesEndRef = useRef(null);
 
-  // Fetch current user, course info, and historical messages
+  // Fetch data
   useEffect(() => {
     const initChat = async () => {
       try {
         const [meRes, courseRes, historyRes] = await Promise.all([
           api.get('users/me/'),
-          api.get(`courses/teacher/${id}/`).catch(() => api.get(`courses/${id}/`)), // Fallback for students later
+          api.get(`courses/teacher/${id}/`).catch(() => api.get(`courses/${id}/`)),
           api.get(`chat/courses/${id}/history/`)
         ]);
         
         setCurrentUser(meRes.data);
         setCourse(courseRes.data);
         
-        // Ensure historical messages are sorted chronologically (oldest to newest)
         const rawHistory = historyRes.data.results || historyRes.data;
-        setMessages(rawHistory.reverse());
+        setMessages(Array.isArray(rawHistory) ? rawHistory.reverse() : []);
       } catch (err) {
         console.error("Failed to initialize chat:", err);
       }
@@ -45,13 +44,15 @@ export default function CourseChat() {
     initChat();
   }, [id]);
 
-  // Establish WebSocket Connection
+  // WebSocket
   useEffect(() => {
     const token = localStorage.getItem('access_token');
+    if (!token) return;
+
     const wsUrl = `ws://localhost:8000/ws/chat/${id}/?token=${token}`;
     ws.current = new WebSocket(wsUrl);
+    
     ws.current.onopen = () => {
-      console.log('WebSocket Connected to Course Chat');
       setIsConnected(true);
     };
 
@@ -59,32 +60,29 @@ export default function CourseChat() {
       const data = JSON.parse(event.data);
       if (data.error) {
         console.error("WebSocket Error:", data.error);
-        alert("Chat Error: " + data.error);
         return;
       }
-
       const incomingMsg = {
-        id: Date.now(), 
+        id: data.id || Date.now(),
         sender_info: { username: data.user },
         content: data.message,
         file: data.file_url,
-        formatted_timestamp: data.timestamp
+        formatted_timestamp: data.timestamp || new Date().toLocaleTimeString()
       };
+      
       setMessages((prev) => [...prev, incomingMsg]);
     };
 
     ws.current.onclose = () => {
-      console.log('WebSocket Disconnected');
       setIsConnected(false);
     };
 
-    // Cleanup on unmount
     return () => {
       if (ws.current) ws.current.close();
     };
   }, [id]);
 
-  // Handle file upload & sending message
+  // Send Message
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() && !file) return;
@@ -97,7 +95,6 @@ export default function CourseChat() {
       formData.append('file', file);
       
       try {
-        // Must match  ChatFileUploadAPIView endpoint
         const uploadRes = await api.post('chat/upload/', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
@@ -110,17 +107,14 @@ export default function CourseChat() {
       setIsUploading(false);
     }
 
-    // Ensure WebSocket is open before sending
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       const payload = {
         message: newMessage,
         file_url: uploadedFileUrl
       };
       
-      // Send via WebSocket (Django Consumer receives this)
       ws.current.send(JSON.stringify(payload));
       
-      // Clear inputs
       setNewMessage('');
       setFile(null);
     } else {
@@ -128,11 +122,22 @@ export default function CourseChat() {
     }
   };
 
+  // Delete Message
+  const handleDeleteMessage = async (messageId) => {
+    try {
+      await api.delete(`chat/messages/${messageId}/`);
+      setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageId));
+    } catch (error) {
+      console.error("Failed to delete message", error);
+      alert("Failed to delete message. It might have already been removed.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pt-6 pb-0">
       <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col bg-white shadow-xl border border-slate-200 sm:rounded-2xl overflow-hidden my-4">
         
-        {/* Chat Header */}
+        {/* Header */}
         <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
           <div>
             <Link to="/dashboard" className="text-indigo-200 hover:text-white text-sm font-medium mb-1 block">
@@ -151,7 +156,7 @@ export default function CourseChat() {
           </div>
         </div>
 
-        {/* Chat Messages Area */}
+        {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400">
@@ -161,39 +166,57 @@ export default function CourseChat() {
             </div>
           ) : (
             messages.map((msg, index) => {
-              const isMe = msg.sender_info.username === currentUser?.username;
+              const msgUsername = msg?.sender_info?.username || msg?.sender?.username || '';
+              const currentUsername = currentUser?.username || '';
+              
+              const isMe = msgUsername && currentUsername && msgUsername === currentUsername;
+              
               return (
-                <div key={msg.id || index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                  {/* Sender Name */}
+                <div 
+                  key={msg?.id || index} 
+                  className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                >
                   <span className="text-[11px] font-bold text-slate-400 mb-1 ml-1 mr-1 uppercase tracking-wider">
-                    {msg.sender_info.username}
+                    {msgUsername || 'Unknown User'}
                   </span>
                   
-                  {/* Message Bubble */}
-                  <div className={`relative max-w-[75%] px-5 py-3 rounded-2xl shadow-sm ${
-                    isMe 
-                      ? 'bg-indigo-600 text-white rounded-br-none' 
-                      : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
-                  }`}>
-                    {/* Text Content */}
-                    {msg.content && <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>}
+                  <div className={`flex items-center gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                     
-                    {/* Attached File/Image */}
-                    {msg.file && (
-                      <div className={`mt-2 ${msg.content ? 'pt-2 border-t border-white/20' : ''}`}>
-                        {msg.file.match(/\.(jpeg|jpg|gif|png)$/i) ? (
-                          <img src={getMediaUrl(msg.file)} alt="attachment" className="rounded-lg max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(getMediaUrl(msg.file), '_blank')} />
-                        ) : (
-                          <a href={getMediaUrl(msg.file)} target="_blank" rel="noreferrer" className={`flex items-center gap-2 text-sm font-bold underline ${isMe ? 'text-indigo-100 hover:text-white' : 'text-indigo-600 hover:text-indigo-800'}`}>
-                            <span>📁 Download Attachment</span>
-                          </a>
-                        )}
-                      </div>
+                    {/* Message Bubble */}
+                    <div className={`relative max-w-[280px] sm:max-w-md px-5 py-3 rounded-2xl shadow-sm ${
+                      isMe 
+                        ? 'bg-indigo-600 text-white rounded-br-none' 
+                        : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
+                    }`}>
+                      {msg?.content && <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>}
+                      
+                      {msg?.file && (
+                        <div className={`mt-2 ${msg.content ? 'pt-2 border-t border-white/20' : ''}`}>
+                          {msg.file.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                            <img src={getMediaUrl(msg.file)} alt="attachment" className="rounded-lg max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(getMediaUrl(msg.file), '_blank')} />
+                          ) : (
+                            <a href={getMediaUrl(msg.file)} target="_blank" rel="noreferrer" className={`flex items-center gap-2 text-sm font-bold underline ${isMe ? 'text-indigo-100 hover:text-white' : 'text-indigo-600 hover:text-indigo-800'}`}>
+                              <span>Download Attachment</span>
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {isMe && (
+                      <button
+                        onClick={() => handleDeleteMessage(msg.id)}
+                        className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all cursor-pointer flex-shrink-0"
+                        title="Delete message"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     )}
                   </div>
                   
-                  {/* Timestamp */}
-                  <span className="text-[10px] text-slate-400 mt-1">{msg.formatted_timestamp}</span>
+                  <span className="text-[10px] text-slate-400 mt-1">{msg?.formatted_timestamp || 'Just now'}</span>
                 </div>
               );
             })
@@ -201,10 +224,8 @@ export default function CourseChat() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Chat Input Area */}
+        {/* Input Area */}
         <div className="bg-white border-t border-slate-200 p-4">
-          
-          {/* File Preview before sending */}
           {file && (
             <div className="mb-3 flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-lg max-w-max">
               <span className="text-xl">📎</span>

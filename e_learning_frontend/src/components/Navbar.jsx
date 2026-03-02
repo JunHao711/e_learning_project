@@ -32,12 +32,29 @@ export default function Navbar() {
             fetchNotifications();
           }
         })
-        .catch(err => console.error(err));
+        .catch(err => {
+          console.error(err);
+          localStorage.removeItem('access_token');
+          setIsLoggedIn(false);
+        });
     } else {
       // Clear user data if token not found
       setCurrentUser(null);
     }
   }, [location.pathname]); // trigger when path changes
+
+  const handleDeleteNotification = async(e, notifId) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    try{
+      await api.delete(`users/notifications/${notifId}/`);
+      setNotifications(prev => prev.filter(n => n.id !== notifId));
+
+    }catch(error){
+      console.error("Failed to delete notification", error);
+    }
+  }
 
   // Fetch notification 
   const fetchNotifications = async () => {
@@ -162,13 +179,26 @@ export default function Navbar() {
                             ) : (
                               <ul className="divide-y divide-slate-50">
                                 {notifications.map((notif) => (
-                                  <li key={notif.id} onClick={() => handleMarkAsRead(notif.id, notif.link)} className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${!notif.is_read ? 'bg-indigo-50/30' : ''}`}>
-                                    <div className="flex justify-between items-start mb-1">
+                                  <li 
+                                    key={notif.id} 
+                                    onClick={() => handleMarkAsRead(notif.id, notif.link)} 
+                                    className={`group relative p-4 hover:bg-slate-50 cursor-pointer transition-colors ${!notif.is_read ? 'bg-indigo-50/30' : ''}`}
+                                  >
+                                    <div className="flex justify-between items-start mb-1 pr-8">
                                       <h4 className={`text-sm ${!notif.is_read ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>{notif.title}</h4>
                                       {!notif.is_read && <span className="h-2 w-2 bg-indigo-500 rounded-full mt-1.5"></span>}
                                     </div>
                                     <p className="text-xs text-slate-500 line-clamp-2">{notif.message}</p>
                                     <span className="text-[10px] text-slate-400 mt-2 block">{new Date(notif.created_at).toLocaleString()}</span>
+                                    <button
+                                      onClick={(e) => handleDeleteNotification(e, notif.id)}
+                                      className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all cursor-pointer"
+                                      title="Delete notification"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
                                   </li>
                                 ))}
                               </ul>

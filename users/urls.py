@@ -20,6 +20,9 @@ urlpatterns = [
     # changing password endpoint
     path('me/change-password/', views.ChangePasswordAPIView.as_view(), name='api_change_password'),
     
+    # delete own notification
+    path('notifications/<int:pk>/', views.NotificationDeleteView.as_view(), name='notification-delete'),
+
     # post a new status update to their profile endpoint
     path('status/', views.UserStatusCreateAPIView.as_view(), name='api_user_status_create'),
     

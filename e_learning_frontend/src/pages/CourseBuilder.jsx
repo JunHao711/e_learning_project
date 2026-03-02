@@ -355,21 +355,19 @@ export default function CourseBuilder() {
             </div>
 
             <form onSubmit={handleAddContent} className="space-y-5">
-              {/* 1. 类型选择器 (Type Selector) */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Content Type</label>
                 <select 
                   value={contentType} onChange={(e) => setContentType(e.target.value)}
                   className="block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-medium text-slate-700"
                 >
-                  <option value="text">📝 Text / Article</option>
-                  <option value="video">📺 Video URL</option>
-                  <option value="image">🖼️ Image</option>
-                  <option value="file">📁 Document / File</option>
+                  <option value="text">Text / Article</option>
+                  <option value="video">Video URL</option>
+                  <option value="image">Image</option>
+                  <option value="file">Document / File</option>
                 </select>
               </div>
 
-              {/* 2. 通用字段：标题 */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Content Title</label>
                 <input 
@@ -378,7 +376,6 @@ export default function CourseBuilder() {
                 />
               </div>
 
-              {/* 3. 动态表单区域 (Dynamic Fields) */}
               {contentType === 'text' && (
                 <div className="animate-fade-in">
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Article Content</label>
@@ -454,7 +451,7 @@ export default function CourseBuilder() {
                   <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Cover Image</label>
                   <input type="file" accept="image/*" onChange={(e) => setCourseImageFile(e.target.files[0])} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors" />
                   {course.image && !courseImageFile && (
-                    <p className="mt-2 text-xs text-emerald-600 font-medium">✓ Current image active. Uploading a new one will replace it.</p>
+                    <p className="mt-2 text-xs text-emerald-600 font-medium">Uploading a new one will replace it.</p>
                   )}
                 </div>
               </form>

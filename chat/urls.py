@@ -12,4 +12,8 @@ urlpatterns = [
     path('upload/', views.ChatFileUploadAPIView.as_view(), name='api_chat_file_upload'),
     # recent conversation
     path('conversations/', views.RecentConversationsAPIView.as_view(), name='api_recent_conversations'),
+    # delete group message
+    path('messages/<int:pk>/', views.MessageDeleteView.as_view(), name='message-delete'),
+    # delete own private messages
+    path('private-messages/<int:pk>/', views.PrivateMessageDeleteView.as_view(), name='private-message-delete'),
 ]

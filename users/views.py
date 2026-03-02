@@ -183,3 +183,14 @@ class ChangePasswordAPIView(generics.UpdateAPIView):
     
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+class NotificationDeleteView(generics.DestroyAPIView):
+    '''
+    DELETE /api/notifications/<id>/
+    Allow user delete their notifications
+    '''
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # only allow delete own notification message
+        return Notification.objects.filter(recipient=self.request.user)

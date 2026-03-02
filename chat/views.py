@@ -9,7 +9,7 @@ from django.db.models import Q
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from courses.models import Course
-from .models import PrivateMessage
+from .models import PrivateMessage, Message
 from .serializers import ChatMessageSerializer, PrivateMessageSerializer
 
 User = get_user_model()
@@ -91,6 +91,25 @@ class ChatFileUploadAPIView(APIView):
             "url": file_url, 
             "name": uploaded_file.name
         }, status=status.HTTP_201_CREATED)
+
+class MessageDeleteView(generics.DestroyAPIView):
+    '''
+    DELETE /api/chat/messages/<id>/
+    only allow delete own message
+    '''
+    permission_classes = [permissions.IsAuthenticated]
+    def get_queryset(self):
+        return Message.objects.filter(sender=self.request.user)
+
+class PrivateMessageDeleteView(generics.DestroyAPIView):
+    '''
+    DELETE /api/chat/private-messages/<id>/
+    only allow delete own private message
+    '''
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        return PrivateMessage.objects.filter(sender=self.request.user)
 
 class RecentConversationsAPIView(APIView):
     """

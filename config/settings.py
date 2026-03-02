@@ -26,9 +26,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 SECRET_KEY = 'django-insecure-c1wh9gsv0v@*#l5@6#7u99_&qe=nn+wuf09*b^f_0u!8-(0zvu'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost')
+ALLOWED_HOSTS = allowed_hosts_env.split(',')
 
 # tell django ingore its default user table
 AUTH_USER_MODEL = 'users.CustomUser'

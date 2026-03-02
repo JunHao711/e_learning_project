@@ -104,7 +104,7 @@ export default function Inbox() {
       }
 
       const incomingMsg = {
-        id: Date.now(),
+        id: data.id || Date.now(),
         sender_info: { username: data.user },
         content: data.message,
         file: data.file_url,
@@ -161,6 +161,16 @@ export default function Inbox() {
       setFile(null);
     } else {
       alert("Chat connection lost. Please refresh.");
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    try {
+      await api.delete(`chat/private-messages/${messageId}/`);
+      setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageId));
+    } catch (error) {
+      console.error("Failed to delete message", error);
+      alert("Failed to delete message. It might have already been removed.");
     }
   };
 
@@ -243,28 +253,48 @@ export default function Inbox() {
                   </div>
                 ) : (
                   messages.map((msg, index) => {
-                    const isMe = msg.sender_info.username === currentUser?.username;
+                    const msgUsername = msg?.sender_info?.username || msg?.sender?.username || '';
+                    const currentUsername = currentUser?.username || '';
+                    const isMe = msgUsername && currentUsername && msgUsername === currentUsername;
+
                     return (
-                      <div key={msg.id || index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                        <div className={`relative max-w-[70%] px-5 py-3 rounded-2xl shadow-sm ${
-                          isMe 
-                            ? 'bg-indigo-600 text-white rounded-br-none' 
-                            : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
-                        }`}>
-                          {msg.content && <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>}
-                          {msg.file && (
-                            <div className={`mt-2 ${msg.content ? 'pt-2 border-t border-white/20' : ''}`}>
-                              {msg.file.match(/\.(jpeg|jpg|gif|png)$/i) ? (
-                                <img src={getMediaUrl(msg.file)} alt="attachment" className="rounded-lg max-h-48 object-cover cursor-pointer hover:opacity-90" onClick={() => window.open(getMediaUrl(msg.file), '_blank')} />
-                              ) : (
-                                <a href={getMediaUrl(msg.file)} target="_blank" rel="noreferrer" className={`text-sm font-bold underline ${isMe ? 'text-indigo-100' : 'text-indigo-600'}`}>
-                                  📁 Download Attachment
-                                </a>
-                              )}
-                            </div>
+                      <div key={msg?.id || index} className={`group flex flex-col mb-4 ${isMe ? 'items-end' : 'items-start'}`}>
+                        
+                        <div className={`flex items-center gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                          
+                          <div className={`relative max-w-[70%] px-5 py-3 rounded-2xl shadow-sm ${
+                            isMe 
+                              ? 'bg-indigo-600 text-white rounded-br-none' 
+                              : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
+                          }`}>
+                            {msg?.content && <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>}
+                            
+                            {msg?.file && (
+                              <div className={`mt-2 ${msg.content ? 'pt-2 border-t border-white/20' : ''}`}>
+                                {msg.file.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                                  <img src={getMediaUrl(msg.file)} alt="attachment" className="rounded-lg max-h-48 object-cover cursor-pointer hover:opacity-90" onClick={() => window.open(getMediaUrl(msg.file), '_blank')} />
+                                ) : (
+                                  <a href={getMediaUrl(msg.file)} target="_blank" rel="noreferrer" className={`text-sm font-bold underline ${isMe ? 'text-indigo-100' : 'text-indigo-600'}`}>
+                                    Download Attachment
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {isMe && (
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all cursor-pointer flex-shrink-0"
+                              title="Delete message"
+                            >
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
                           )}
                         </div>
-                        <span className="text-[10px] text-slate-400 mt-1">{msg.formatted_timestamp}</span>
+                        
+                        <span className="text-[10px] text-slate-400 mt-1">{msg?.formatted_timestamp || 'Just now'}</span>
                       </div>
                     );
                   })

@@ -45,12 +45,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             user = self.scope['user']
             # Ensure the user is actually logged in before processing
             if user.is_authenticated:
-                await self.save_message(user, self.course_id, message, file_url)
+                saved_msg = await self.save_message(user, self.course_id, message, file_url)
                 # Broadcast the message to all channels in this group
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {
                         'type': 'chat_message',
+                        'id': saved_msg.id,
                         'message': message,
                         'file_url': file_url,
                         'user': user.username,
@@ -66,6 +67,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps({
+            'id': event.get('id'),
             'message': event['message'],
             'file_url': event.get('file_url'),
             'user': event['user'],
@@ -113,14 +115,16 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
             file_url = data.get('file_url', None)
             target_user_id = data.get('target_user_id')
             sender = self.scope['user']
+            
 
             if sender.is_authenticated and target_user_id:
-                await self.save_private_message(sender, target_user_id, message, file_url)
+                saved_msg = await self.save_private_message(sender, target_user_id, message, file_url)
 
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {
                         'type': 'chat_message',
+                        'id': saved_msg.id,
                         'message': message,
                         'file_url': file_url, 
                         'user': sender.username,
@@ -136,6 +140,7 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps({
+            'id': event.get('id'),
             'message': event['message'],
             'file_url': event.get('file_url'),
             'user': event['user'],
@@ -156,3 +161,5 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
             msg.file.name = decoded_url.replace('/media/', '')
             
         msg.save()
+
+        return msg
