@@ -17,6 +17,9 @@
 * **Backend API Base**: http://localhost:8000/
 * **Admin Dashboard**: http://localhost:8000/admin/
 
+## Deployment Link
+* http://174.138.29.8:5173/
+
 ## Test Accounts (Pre-configured)
 * **Admin** -> username: `admin` | password: `admin12345`
 * **Teacher** -> username: `teacher_lim` | password: `ttt12345`
