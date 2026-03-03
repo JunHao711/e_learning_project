@@ -6,7 +6,7 @@ class SecurityHeaderMiddleware(MiddlewareMixin):
     blocking any malicious third-party embedding
     '''
     def process_response(self, request, response):
-        response['Content-Security-Policy'] = "frame-ancestors 'self' http://localhost:5173 http://127.0.0.1:5173"
+        response['Content-Security-Policy'] = "frame-ancestors 'self' http://localhost:5173 http://127.0.0.1:5173 http://174.138.29.8:5173"
         
         if 'X-Frame-Options' in response:
             del response['X-Frame-Options']
