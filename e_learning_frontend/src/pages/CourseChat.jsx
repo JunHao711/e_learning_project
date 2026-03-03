@@ -47,9 +47,11 @@ export default function CourseChat() {
   // WebSocket
   useEffect(() => {
     const token = localStorage.getItem('access_token');
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const WS_BASE = isLocal ? 'ws://localhost:8000' : `ws://${window.location.hostname}:8000`;
     if (!token) return;
 
-    const wsUrl = `ws://localhost:8000/ws/chat/${id}/?token=${token}`;
+    const wsUrl = `${WS_BASE}/ws/chat/${id}/?token=${token}`;
     ws.current = new WebSocket(wsUrl);
     
     ws.current.onopen = () => {

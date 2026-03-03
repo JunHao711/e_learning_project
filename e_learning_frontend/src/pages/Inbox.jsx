@@ -82,9 +82,10 @@ export default function Inbox() {
   // create websocket connection when roomName is acquired
   useEffect(() => {
     if (!roomName) return;
-
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const WS_BASE = isLocal ? 'ws://localhost:8000' : `ws://${window.location.hostname}:8000`;    
     const token = localStorage.getItem('access_token');
-    const wsUrl = `ws://localhost:8000/ws/chat/${roomName}/?token=${token}`;
+    const wsUrl = `${WS_BASE}/ws/chat/${roomName}/?token=${token}`;
     
     // Close existing connection if switching chats
     if (ws.current) ws.current.close();

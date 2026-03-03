@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import { getMediaUrl } from '../components/utils';
 
 export default function CourseBuilder() {
   const { id } = useParams(); 
@@ -27,12 +28,6 @@ export default function CourseBuilder() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-
-  const getMediaUrl = (path) => {
-    if (!path) return '';
-    if (path.startsWith('http')) return path; 
-    return `http://localhost:8000${path}`;
-  };
 
   useEffect(() => {
     fetchCourseAndModules();

@@ -27,8 +27,7 @@ SECRET_KEY = 'django-insecure-c1wh9gsv0v@*#l5@6#7u99_&qe=nn+wuf09*b^f_0u!8-(0zvu
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
-allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost')
-ALLOWED_HOSTS = allowed_hosts_env.split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost,174.138.29.8').split(',')
 
 # tell django ingore its default user table
 AUTH_USER_MODEL = 'users.CustomUser'
@@ -102,6 +101,7 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://174.138.29.8:5173",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
