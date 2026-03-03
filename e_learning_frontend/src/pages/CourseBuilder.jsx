@@ -1,474 +1,533 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { getMediaUrl } from '../components/utils';
 
-export default function CourseBuilder() {
-  const { id } = useParams(); 
-  const navigate = useNavigate();
-  const [course, setCourse] = useState(null);
-  const [modules, setModules] = useState([]);
-  
-  const [newModuleTitle, setNewModuleTitle] = useState('');
-  const [newModuleDesc, setNewModuleDesc] = useState('');
-  const [isAddingModule, setIsAddingModule] = useState(false);
+function StatCard({ title, value, color }) {
+  const colors = {
+    indigo: "bg-indigo-50 text-indigo-900 border-indigo-100",
+    emerald: "bg-emerald-50 text-emerald-900 border-emerald-100",
+    purple: "bg-purple-50 text-purple-900 border-purple-100"
+  };
+  return (
+    <div className={`p-5 sm:p-6 rounded-xl border ${colors[color]} shadow-sm`}>
+      <h3 className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{title}</h3>
+      <span className="text-2xl sm:text-3xl font-black">{value || 0}</span>
+    </div>
+  );
+}
 
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [courseForm, setCourseForm] = useState({ title: '', course_code: '', overview: '' });
-  const [courseImageFile, setCourseImageFile] = useState(null);
-  const [isUpdatingCourse, setIsUpdatingCourse] = useState(false);
-  
-  const [activeModuleId, setActiveModuleId] = useState(null);
-  const [contentType, setContentType] = useState('text');
-  const [contentForm, setContentForm] = useState({ title: '', content: '', url: '' });
-  const [contentFile, setContentFile] = useState(null);
-  const [isAddingContent, setIsAddingContent] = useState(false);
-
-  const [previewItem, setPreviewItem] = useState(null);
-  
+export default function Dashboard() {
+  const [user, setUser] = useState(null);
+  const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [statusText, setStatusText] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
 
   useEffect(() => {
-    fetchCourseAndModules();
-  }, [id]);
+    const fetchDashboardData = async () => {
+      try {
+        const userRes = await api.get('users/me/'); 
+        const userData = userRes.data;
 
-  const fetchCourseAndModules = async () => {
-    try {
-      const courseRes = await api.get(`courses/teacher/${id}/`);
-      setCourse(courseRes.data);
+        const normalizedRole = userData.role ? String(userData.role).toLowerCase() : 'student';
+        const formattedUser = { ...userData, role: normalizedRole };
+        setUser(formattedUser);
 
-      setCourseForm({
-        title: courseRes.data.title || '',
-        course_code: courseRes.data.course_code || '',
-        overview: courseRes.data.overview || ''
-      });
+        if (normalizedRole === 'admin') {
+          const coursesRes = await api.get('courses/admin/all/');
+          const fetchedCourses = coursesRes.data.results ? coursesRes.data.results : coursesRes.data;          
+          setCourses(Array.isArray(fetchedCourses) ? fetchedCourses : []);
+        }
+        else if(normalizedRole === 'teacher'){
+          const coursesRes = await api.get('courses/teacher/mine');
+          const fetchedCourses = coursesRes.data.results ? coursesRes.data.results : coursesRes.data;          
+          setCourses(Array.isArray(fetchedCourses) ? fetchedCourses : []);
+        }
+        else{
+          const coursesRes = await api.get('courses/enrolled/');
+          const fetchedCourses = coursesRes.data.results ? coursesRes.data.results : coursesRes.data;          
+          setCourses(Array.isArray(fetchedCourses) ? fetchedCourses : []);
+        }
 
-      const modulesRes = await api.get(`courses/teacher/${id}/modules/`);
-      const fetchedModules = modulesRes.data.results ? modulesRes.data.results : modulesRes.data;
-      setModules(Array.isArray(fetchedModules) ? fetchedModules : []);
-    } catch (err) {
-      setError('Could not load course details.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateCourse = async (e) => {
-    e.preventDefault();
-    setIsUpdatingCourse(true);
-    try {
-      const formData = new FormData();
-      formData.append('title', courseForm.title);
-      formData.append('course_code', courseForm.course_code);
-      formData.append('overview', courseForm.overview);
-      
-      if (courseImageFile) {
-        formData.append('image', courseImageFile);
+      } catch (err) {
+        console.error("Failed to fetch dashboard data:", err);
+        if (err.response?.status === 401) {
+          return;
+        }
+        setError('Failed to load dashboard. Please try logging in again.');
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      const res = await api.patch(`courses/teacher/${id}/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
-      setCourse(res.data); 
-      setShowSettingsModal(false);
-      setCourseImageFile(null);
-      alert("Course updated successfully!");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to update course.");
-    } finally {
-      setIsUpdatingCourse(false);
-    }
-  };
+    fetchDashboardData();
+  }, []);
 
-  const handleDeleteCourse = async () => {
-    const confirmName = window.prompt(`DANGER ZONE \n\nThis will permanently delete ALL modules, contents, and student records for this course.\n\nType the course name "${course.title}" to confirm:`);
-    
-    if (confirmName !== course.title) {
-      if (confirmName !== null) alert("Course name did not match. Deletion cancelled.");
-      return;
-    }
-
-    try {
-      await api.delete(`courses/teacher/${id}/`);
-      alert("Course permanently deleted.");
-      navigate('/dashboard');
-    } catch (err) {
-      alert("Failed to delete course.");
-    }
-  };
-
-  const handleDeleteModule = async (moduleId, moduleTitle) => {
-    if (!window.confirm(`DANGER ZONE \n\nAre you sure you want to delete "${moduleTitle}"?\nAll contents inside this module will be permanently lost.`)) return;
-
-    try {
-      await api.delete(`courses/teacher/modules/${moduleId}/`);
-            setModules(prevModules => prevModules.filter(m => m.id !== moduleId));
-      
-    } catch (err) {
-      console.error("Failed to delete module:", err);
-      alert("Failed to delete module. Please try again.");
-    }
-  };
-
-  const handleAddModule = async (e) => {
+  const handlePostStatus = async (e) => {
     e.preventDefault();
-    if (!newModuleTitle.trim()) return;
-    setIsAddingModule(true);
+    if (!statusText.trim()) return;
+    setIsPosting(true);
     try {
-      const response = await api.post(`courses/teacher/${id}/modules/`, {
-        title: newModuleTitle,
-        description: newModuleDesc
-      });
-      setModules([...modules, { ...response.data, contents: [] }]);
-      setNewModuleTitle('');
-      setNewModuleDesc('');
+      await api.patch('users/me/', { bio: statusText }); 
+      alert("Status updated successfully on your profile!");
+      setStatusText('');
     } catch (err) {
-      alert('Failed to create module.');
+      console.error("Failed to post status:", err);
+      alert("Failed to update status.");
     } finally {
-      setIsAddingModule(false);
+      setIsPosting(false);
     }
   };
 
-  const handleAddContent = async (e) => {
-    e.preventDefault();
-    setIsAddingContent(true);
-    try {
-      let payload;
-      let config = {};
-      if (contentType === 'text') {
-        payload = { title: contentForm.title, content: contentForm.content };
-      } else if (contentType === 'video') {
-        payload = { title: contentForm.title, url: contentForm.url };
-      } else if (contentType === 'image' || contentType === 'file') {
-        payload = new FormData();
-        payload.append('title', contentForm.title);
-        payload.append('file', contentFile);
-        config = { headers: { 'Content-Type': 'multipart/form-data' } };
-      }
-      await api.post(`courses/teacher/modules/${activeModuleId}/content/${contentType}/`, payload, config);
-      fetchCourseAndModules();
-      closeModal();
-    } catch (err) {
-      alert('Failed to add content.');
-    } finally {
-      setIsAddingContent(false);
-    }
-  };
-
-  const handleDeleteContent = async (contentId) => {
-    if (!window.confirm("Are you sure you want to delete this content?")) return;
-    try {
-      await api.delete(`courses/teacher/content/${contentId}/`);
-      setModules(prev => prev.map(mod => ({
-        ...mod,
-        contents: mod.contents.filter(c => c.id !== contentId)
-      })));
-    } catch (err) {
-      alert("Delete failed.");
-    }
-  };
-
-  const closeModal = () => {
-    setActiveModuleId(null);
-    setContentType('text');
-    setContentForm({ title: '', content: '', url: '' });
-    setContentFile(null);
-  };
-
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center animate-pulse text-indigo-600 font-bold text-xl">Loading Builder...</div>;
-  if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
-
-  return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8 relative">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-8">
-          <Link to="/dashboard" className="text-sm font-medium text-slate-500 hover:text-indigo-600 flex items-center gap-1 mb-2">
-            &larr; Back to Dashboard
-          </Link>
-          <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3">
-            {course.title}
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">Builder Mode</span>
-          </h1>
-          
-        </div>
-
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <h2 className="text-xl font-bold text-slate-800 border-b border-slate-200 pb-2">Curriculum</h2>
-            {modules.length === 0 ? (
-              <div className="bg-white border-2 border-dashed border-slate-300 rounded-xl p-10 text-center text-slate-500">
-                Start building your course by adding your first module.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {modules.map((module, index) => (
-                  <div key={module.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-start gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm">
-                            {index + 1}
-                          </span>
-                          <h3 className="text-lg font-bold text-slate-800 truncate">{module.title}</h3>
-                        </div>
-                        {module.description && (
-                          <p className="text-sm text-slate-500 ml-11 line-clamp-2 break-words">
-                            {module.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-shrink-0 mt-1">
-                        <button 
-                          onClick={() => handleDeleteModule(module.id, module.title)}
-                          className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Delete Module"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-
-                        <button 
-                          onClick={() => setActiveModuleId(module.id) }
-                          className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-sm transition-colors cursor-pointer"
-                        >
-                          + Add Content
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="p-4 bg-white">
-                      {(!module.contents || module.contents.length === 0) ? (
-                        <p className="text-center text-sm text-slate-400 italic py-2">No content uploaded yet.</p>
-                      ) : (
-                        <ul className="space-y-3">
-                          {[...module.contents].sort((a, b) => a.order - b.order).map((item, i) => (
-                            <li key={item.id} className="group flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-indigo-300 transition-all">
-                              <div className="flex-1 min-w-0"> 
-                                <h4 className="text-sm font-bold text-slate-800 truncate">{item.item.title}</h4>
-                                <span className="text-[10px] uppercase font-bold text-slate-400">{item.item.type}</span>
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <button onClick={() => setPreviewItem(item)} className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 rounded-lg cursor-pointer" title="Preview">
-                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                </button>
-                                <button onClick={() => handleDeleteContent(item.id)} className="p-2 text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 rounded-lg cursor-pointer" title="Delete">
-                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="lg:col-span-1">
-            <button 
-            onClick={() => setShowSettingsModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 mb-8 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl shadow-sm transition-all cursor-pointer"
-          >
-            Course Settings
-          </button>
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-6">
-              <h3 className="text-lg font-bold text-slate-800 mb-4">Add New Module</h3>
-              <form onSubmit={handleAddModule} className="space-y-4">
-                <input type="text" required placeholder="Module Title" value={newModuleTitle} onChange={(e) => setNewModuleTitle(e.target.value)} className="block w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm" />
-                <textarea rows="3" placeholder="Description (Optional)" value={newModuleDesc} onChange={(e) => setNewModuleDesc(e.target.value)} className="block w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm resize-none"></textarea>
-                <button type="submit" disabled={isAddingModule} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg cursor-pointer">{isAddingModule ? 'Adding...' : 'Add Module'}</button>
-              </form>
-            </div>
-          </div>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-pulse text-indigo-600 font-semibold text-lg">
+          Loading your workspace...
         </div>
       </div>
+    );
+  }
 
-      {previewItem && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-              <h3 className="text-xl font-black text-slate-900">{previewItem.item.title} <span className="text-xs font-normal text-slate-400 uppercase">({previewItem.item.type} Preview)</span></h3>
-              <button onClick={() => setPreviewItem(null)} className="p-2 hover:bg-slate-200 rounded-full cursor-pointer"><svg className="w-6 h-6 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-8 bg-white">
-              
-              {/* 视频 */}
-              {previewItem.item.type === 'video' && (
-                <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-inner">
-                  <iframe width="100%" height="100%" src={previewItem.item.url.includes('youtube.com') ? `https://www.youtube.com/embed/${previewItem.item.url.split('v=')[1]}` : previewItem.item.url} frameBorder="0" allowFullScreen></iframe>
-                </div>
-              )}
-              
-              {/* 文本 */}
-              {previewItem.item.type === 'text' && (
-                <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed whitespace-pre-wrap">{previewItem.item.content}</div>
-              )}
-              
-              {/* 🌟 图片 (强力修复绝对路径) */}
-              {previewItem.item.type === 'image' && (
-                <div className="flex justify-center">
-                  <img src={getMediaUrl(previewItem.item.file)} alt="preview" className="max-h-[60vh] h-auto rounded-lg shadow-md border border-slate-100" />
-                </div>
-              )}
-              
-              {/* 🌟 文件直接内嵌预览 (支持 PDF 等浏览器原生格式) */}
-              {previewItem.item.type === 'file' && (
-                <div className="flex flex-col h-[70vh]">
-                  <div className="flex-1 rounded-xl overflow-hidden border border-slate-200 shadow-inner bg-slate-100">
-                    <iframe 
-                      src={getMediaUrl(previewItem.item.file)} 
-                      width="100%" 
-                      height="100%" 
-                      title="File Preview"
-                      className="bg-white"
-                    ></iframe>
-                  </div>
-                </div>
-              )}
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="text-red-500 font-medium text-center">{error}</div>
+      </div>
+    );
+  }
 
-            </div>
+  return (
+    <div className="min-h-screen bg-slate-50 py-6 sm:py-10 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 truncate">
+              Welcome back, {user?.username}
+            </h1>
+            <p className="mt-1 sm:mt-2 text-sm text-slate-600">
+              {user?.role === 'teacher' 
+                ? 'Manage your courses and empower your students.' 
+                : 'Ready to continue your learning journey?'}
+            </p>
           </div>
+          
+          {user?.role === 'teacher' && (
+            <Link 
+              to="/courses/create" 
+              className="px-5 py-2.5 sm:px-6 sm:py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-md transition-transform hover:-translate-y-0.5 text-center flex-shrink-0 whitespace-nowrap"
+            >
+              + Create New Course
+            </Link>
+          )}
         </div>
-      )}
-
-      {activeModuleId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 transform transition-all">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-              <h3 className="text-xl font-bold text-slate-900">Add Content to Module</h3>
-              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleAddContent} className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Content Type</label>
-                <select 
-                  value={contentType} onChange={(e) => setContentType(e.target.value)}
-                  className="block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-medium text-slate-700"
-                >
-                  <option value="text">Text / Article</option>
-                  <option value="video">Video URL</option>
-                  <option value="image">Image</option>
-                  <option value="file">Document / File</option>
-                </select>
+        
+        {user?.role !== 'admin' && (
+          <div className="mb-8 sm:mb-10 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 mt-4 sm:mt-8">
+            <form onSubmit={handlePostStatus} className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="hidden sm:flex w-10 h-10 rounded-full bg-indigo-100 items-center justify-center text-indigo-600 font-bold flex-shrink-0">
+                {user?.username.charAt(0).toUpperCase()}
               </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Content Title</label>
-                <input 
-                  type="text" required placeholder="e.g. Introduction to Variables" value={contentForm.title} onChange={(e) => setContentForm({ ...contentForm, title: e.target.value })}
-                  className="block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+              <div className="flex-1 flex gap-2 sm:gap-3">
+                <input
+                  type="text"
+                  placeholder="Share an update to your profile..."
+                  value={statusText}
+                  onChange={(e) => setStatusText(e.target.value)}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 sm:px-4 py-2 sm:py-0 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm sm:text-base min-w-0"
                 />
-              </div>
-
-              {contentType === 'text' && (
-                <div className="animate-fade-in">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Article Content</label>
-                  <textarea 
-                    required rows="5" placeholder="Write your lesson here..." value={contentForm.content} onChange={(e) => setContentForm({ ...contentForm, content: e.target.value })}
-                    className="block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm resize-y"
-                  ></textarea>
-                </div>
-              )}
-
-              {contentType === 'video' && (
-                <div className="animate-fade-in">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Video URL (YouTube/Vimeo)</label>
-                  <input 
-                    type="url" required placeholder="https://..." value={contentForm.url} onChange={(e) => setContentForm({ ...contentForm, url: e.target.value })}
-                    className="block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-              )}
-
-              {(contentType === 'image' || contentType === 'file') && (
-                <div className="animate-fade-in">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Upload File</label>
-                  <input 
-                    type="file" required onChange={(e) => setContentFile(e.target.files[0])}
-                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors"
-                  />
-                </div>
-              )}
-
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={closeModal} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors cursor-pointer">
-                  Cancel
-                </button>
-                <button type="submit" disabled={isAddingContent} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm disabled:bg-indigo-400 transition-colors cursor-pointer">
-                  {isAddingContent ? 'Saving...' : 'Save Content'}
+                <button 
+                  type="submit" 
+                  disabled={isPosting || !statusText.trim()}
+                  className="px-4 sm:px-6 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold rounded-xl transition-colors shadow-sm cursor-pointer flex-shrink-0 text-sm sm:text-base"
+                >
+                  {isPosting ? 'Posting...' : 'Post'}
                 </button>
               </div>
             </form>
           </div>
+        )}
+
+        {/* Role based routing */}
+        {user?.role === 'admin' ? (
+          <AdminWorkspace courses={courses} setCourses={setCourses} />
+        ) : user?.role === 'teacher' ? (
+          <TeacherWorkspace courses={courses} />
+        ) : (
+          <StudentWorkspace courses={courses} />
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// Teacher Dashboard
+function TeacherWorkspace({ courses }) {
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <h2 className="text-lg sm:text-xl font-bold text-slate-800 border-b pb-2">My Courses</h2>
+      
+      {courses.length === 0 ? (
+        <div className="bg-white border-2 border-dashed border-slate-300 rounded-xl p-8 sm:p-12 text-center">
+          <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-slate-900">No courses yet</h3>
+          <p className="mt-1 text-xs sm:text-sm text-slate-500">Get started by creating your very first course.</p>
         </div>
-      )}
-
-      {showSettingsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full transform transition-all flex flex-col max-h-[90vh]">
-            
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-              <h3 className="text-xl font-black text-slate-900">Course Settings</h3>
-              <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">✕</button>
-            </div>
-
-            <div className="p-6 overflow-y-auto flex-1">
-              <form id="course-settings-form" onSubmit={handleUpdateCourse} className="space-y-5">
-                
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Course Title</label>
-                    <input type="text" required value={courseForm.title} onChange={(e) => setCourseForm({...courseForm, title: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 font-medium outline-none" />
-                  </div>
-                  <div className="w-1/3">
-                    <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Code</label>
-                    <input type="text" value={courseForm.course_code} onChange={(e) => setCourseForm({...courseForm, course_code: e.target.value})} placeholder="e.g. CS101" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 font-medium outline-none" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Course Overview</label>
-                  <textarea rows="4" value={courseForm.overview} onChange={(e) => setCourseForm({...courseForm, overview: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 outline-none resize-none"></textarea>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Cover Image</label>
-                  <input type="file" accept="image/*" onChange={(e) => setCourseImageFile(e.target.files[0])} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors" />
-                  {course.image && !courseImageFile && (
-                    <p className="mt-2 text-xs text-emerald-600 font-medium">Uploading a new one will replace it.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {courses.map((course, index) => (
+            <div key={index} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+              <div className="h-32 sm:h-40 bg-slate-200 w-full relative overflow-hidden flex-shrink-0">
+                {course.image ? (
+                  <img 
+                    src={course.image} 
+                    alt={course.title} 
+                    className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                  />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white/50 text-3xl sm:text-4xl font-black">
+                      {course.title ? course.title.charAt(0).toUpperCase() : 'C'}
+                    </div>
                   )}
+              </div>
+              <div className="p-4 sm:p-5 flex-1 flex flex-col">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 line-clamp-1">{course.title || "Untitled Course"}</h3>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1 mb-4 line-clamp-2 flex-1">{course.overview || "No description provided."}</p>
+                
+                <div className="pt-3 border-t border-slate-100 flex gap-2">
+                  <Link 
+                    to={`/courses/${course.id}/edit`} 
+                    className="flex-1 text-center text-[11px] sm:text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 py-2 sm:py-2.5 rounded-lg transition-colors truncate px-1"
+                  >
+                    Curriculum
+                  </Link>
+                  <Link 
+                    to={`/courses/${course.id}/students`} 
+                    className="flex-1 text-center text-[11px] sm:text-xs font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-200 hover:border-slate-300 py-2 sm:py-2.5 rounded-lg transition-colors shadow-sm truncate px-1"
+                  >
+                    Students
+                  </Link>
+                  <Link 
+                    to={`/courses/${course.id}/chat`} 
+                    className="flex-1 text-center text-[11px] sm:text-xs font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 hover:border-emerald-200 py-2 sm:py-2.5 rounded-lg transition-colors shadow-sm truncate px-1"
+                  >
+                    Chat
+                  </Link>
                 </div>
-              </form>
-
-              {/* Danger Zone */}
-              <div className="mt-8 pt-6 border-t border-rose-100">
-                <h4 className="text-sm font-bold text-rose-600 mb-2">Danger Zone</h4>
-                <p className="text-xs text-slate-500 mb-3">Once you delete a course, there is no going back. Please be certain.</p>
-                <button type="button" onClick={handleDeleteCourse} className="w-full py-3 bg-white border-2 border-rose-100 hover:border-rose-500 hover:bg-rose-50 text-rose-600 font-bold rounded-xl transition-all cursor-pointer">
-                  Delete This Course
-                </button>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 rounded-b-2xl flex justify-end gap-3">
-              <button type="button" onClick={() => setShowSettingsModal(false)} className="px-6 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer">Cancel</button>
-              <button type="submit" form="course-settings-form" disabled={isUpdatingCourse} className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold rounded-xl shadow-md transition-colors cursor-pointer">
-                {isUpdatingCourse ? 'Saving...' : 'Save Changes'}
-              </button>
+// Student Dashboard
+function StudentWorkspace({ courses }) {
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex justify-between items-end border-b pb-2">
+        <h2 className="text-lg sm:text-xl font-bold text-slate-800">My Learning</h2>
+        <span className="text-xs sm:text-sm font-bold text-indigo-600 bg-indigo-50 px-2 sm:px-3 py-1 rounded-full">
+          {courses.length} Enrolled
+        </span>
+      </div>
+
+      {courses.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-12 text-center">
+          <h3 className="text-lg sm:text-xl font-bold text-slate-900">You haven't enrolled in any courses yet.</h3>
+          <p className="text-xs sm:text-sm text-slate-500 mt-2 mb-6">Explore the catalog and start your learning journey today!</p>
+          <Link to="/" className="inline-block px-5 sm:px-6 py-2.5 sm:py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm sm:text-base font-bold rounded-lg transition-colors shadow-sm">
+            Browse Course Catalog
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {courses.map(course => (
+            <div key={course.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+              
+              <div className="aspect-video bg-slate-100 relative">
+                {course.image ? (
+                  <img src={getMediaUrl(course.image)} alt={course.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-400 font-medium text-sm">No Image</div>
+                )}
+              </div>
+
+              <div className="p-4 sm:p-5 flex-1 flex flex-col">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1 line-clamp-1">
+                  {course.subject || 'General'}
+                </span>
+                <h3 className="text-base sm:text-lg font-bold text-slate-800 leading-snug mb-3 sm:mb-4 line-clamp-2">
+                  {course.title}
+                </h3>
+                
+                <div className="mt-auto border-t border-slate-100 pt-3 sm:pt-4">
+                  <Link 
+                    to={`/student/course/${course.id}`}
+                    className="w-full flex justify-center items-center gap-2 px-4 py-2 sm:py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-sm rounded-lg border border-emerald-200 transition-colors"
+                  >
+                    Continue Learning &rarr;
+                  </Link>
+                </div>
+              </div>
+
             </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-          </div>
+// Admin Dashboard
+function AdminWorkspace({ courses: initialCourses, setCourses: setInitialCourses }) {
+  const [activeTab, setActiveTab] = useState('overview'); 
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [newSubject, setNewSubject] = useState({ title: '', slug: '' });
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [usersList, setUsersList] = useState([]);
+  const [coursesList, setCoursesList] = useState(initialCourses || []);
+  const [subjectsList, setSubjectsList] = useState([]); 
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleTitleChange = (val) => {
+    const slug = val.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+    setNewSubject({ title: val, slug: slug });
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        if (activeTab === 'overview') {
+          const res = await api.get('users/admin/dashboard/');
+          setDashboardStats(res.data);
+        } else if (activeTab === 'users') {
+          const res = await api.get('users/admin/users/');
+          setUsersList(res.data.results || res.data);
+        } else if (activeTab === 'courses') {
+          const res = await api.get('courses/admin/all/');
+          setCoursesList(res.data.results || res.data);
+        } else if (activeTab === 'categories') {
+          const res = await api.get('courses/subjects/');
+          setSubjectsList(res.data.results || res.data);
+        }
+      } catch (err) {
+        console.error(`Failed to fetch ${activeTab} data:`, err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [activeTab]);
+
+  const handleAddSubject = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await api.post('courses/subjects/', newSubject);
+      alert("Category added!");
+      setShowSubjectModal(false);
+      setNewSubject({ title: '', slug: '' });
+      if (activeTab === 'categories') {
+        const res = await api.get('courses/subjects/');
+        setSubjectsList(res.data.results || res.data);
+      }
+    } catch (err) {
+      alert("Error: Title or Slug might already exist.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteSubject = async (id, title) => {
+    if (!window.confirm(`Delete category "${title}"? Courses in this category might be affected.`)) return;
+    try {
+      await api.delete(`courses/subjects/${id}/`);
+      setSubjectsList(prev => prev.filter(s => s.id !== id));
+    } catch (err) {
+      alert("Cannot delete category with active courses.");
+    }
+  };
+
+  const handleToggleActive = async (userId, username, currentStatus) => {
+    const action = currentStatus ? "BAN" : "UNBAN";
+    if (!window.confirm(`Confirm ${action} for ${username}?`)) return;
+    try {
+      await api.post(`users/admin/users/${userId}/toggle-active/`);
+      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_active: !u.is_active } : u));
+    } catch (err) { alert("Failed to change user status."); }
+  };
+
+  const handleDeleteCourse = async (courseId, courseTitle) => {
+    if (!window.confirm(`Force Delete course "${courseTitle}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`courses/admin/${courseId}/`); 
+      setCoursesList(prev => prev.filter(c => c.id !== courseId));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete course. It may contain active dependencies.");
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[60vh] flex flex-col">
+      
+      <div className="bg-slate-50 border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center justify-between">
+        <div className="flex gap-4 sm:gap-6 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-hide">
+          {['overview', 'users', 'courses', 'categories'].map(tab => (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`pb-1 sm:pb-2 font-bold text-xs sm:text-sm capitalize border-b-2 transition-all cursor-pointer whitespace-nowrap flex-shrink-0 ${activeTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            >
+              {tab === 'categories' ? 'Manage Categories' : tab}
+            </button>
+          ))}
+        </div>
+        
+        <button 
+          onClick={() => setShowSubjectModal(true)}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer whitespace-nowrap self-start sm:self-auto"
+        >
+          + Add New Category
+        </button>
+      </div>
+
+      <div className="p-4 sm:p-6 flex-1">
+        {isLoading ? (
+          <div className="py-20 text-center animate-pulse text-indigo-600 font-bold text-sm sm:text-base">Loading...</div>
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
+                <StatCard title="Total Users" value={dashboardStats?.total_users} color="indigo" />
+                <StatCard title="Total Courses" value={dashboardStats?.total_courses} color="emerald" />
+                <StatCard title="Enrollments" value={dashboardStats?.total_enrollments} color="purple" />
+              </div>
+            )}
+
+            {activeTab === 'users' && (
+              <div className="overflow-x-auto -mx-4 sm:mx-0">
+                <div className="inline-block min-w-full align-middle">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">User</th>
+                        <th className="px-4 py-3 text-left text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Role</th>
+                        <th className="px-4 py-3 text-left text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-3 text-right text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {usersList.map(u => (
+                        <tr key={u.id}>
+                          <td className="px-4 py-3 sm:py-4">
+                            <div className="text-xs sm:text-sm font-bold text-slate-900">{u.username}</div>
+                            <div className="text-[10px] sm:text-xs text-slate-400">{u.email}</div>
+                          </td>
+                          <td className="px-4 py-3 sm:py-4">
+                            <span className="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold bg-slate-100 uppercase">{u.role}</span>
+                          </td>
+                          <td className="px-4 py-3 sm:py-4">
+                            <span className={`text-[10px] sm:text-xs font-bold whitespace-nowrap ${u.is_active ? 'text-emerald-500' : 'text-rose-500'}`}>
+                              {u.is_active ? '● Active' : '● Banned'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 sm:py-4 text-right">
+                            <button onClick={() => handleToggleActive(u.id, u.username, u.is_active)} disabled={u.role === 'admin'} className="text-[10px] sm:text-xs font-bold text-rose-600 hover:underline cursor-pointer disabled:opacity-30">
+                              {u.is_active ? 'Ban' : 'Unban'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'categories' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {subjectsList.map(s => (
+                  <div key={s.id} className="p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center group">
+                    <div className="min-w-0 pr-2">
+                      <h4 className="font-bold text-slate-800 text-sm sm:text-base truncate">{s.title}</h4>
+                      <p className="text-[9px] sm:text-[10px] text-slate-400 font-mono truncate">{s.slug}</p>
+                    </div>
+                    <button onClick={() => handleDeleteSubject(s.id, s.title)} className="opacity-100 sm:opacity-0 group-hover:opacity-100 p-1.5 sm:p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer flex-shrink-0">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'courses' && (
+              <div className="overflow-x-auto -mx-4 sm:mx-0">
+                <div className="inline-block min-w-full align-middle">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Course</th>
+                        <th className="px-4 py-3 text-left text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider hidden sm:table-cell">Instructor</th>
+                        <th className="px-4 py-3 text-left text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Students</th>
+                        <th className="px-4 py-3 text-right text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-200">
+                      {coursesList.map(c => (
+                      <tr key={c.id}>
+                        <td className="px-4 py-3 sm:py-4 min-w-[120px] max-w-[200px]">
+                          <div className="font-bold text-slate-900 text-xs sm:text-sm truncate">{c.title}</div>
+                          <div className="text-[10px] sm:text-xs text-indigo-600 font-semibold truncate">{c.subject?.title || c.subject || 'General'}</div>
+                          <div className="text-[10px] text-slate-500 sm:hidden mt-0.5">By {c.owner_name || 'Unknown'}</div>
+                        </td>
+                        <td className="px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-800 font-medium hidden sm:table-cell">
+                          {c.owner_name || 'Unknown'}
+                        </td>
+                        <td className="px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-500 font-bold">
+                          {c.student_count || 0}
+                        </td>
+                        <td className="px-4 py-3 sm:py-4 whitespace-nowrap text-right">
+                          <button 
+                            onClick={() => handleDeleteCourse(c.id, c.title)}
+                            className="px-2.5 py-1.5 sm:px-3 text-[10px] sm:text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {showSubjectModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-5 sm:p-6 animate-fade-in">
+              <h3 className="text-lg font-black mb-4">New Category</h3>
+              <input type="text" placeholder="Title" value={newSubject.title} onChange={e => handleTitleChange(e.target.value)} className="w-full mb-3 p-3 text-sm sm:text-base bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input type="text" placeholder="Slug" value={newSubject.slug} onChange={e => setNewSubject({...newSubject, slug: e.target.value})} className="w-full mb-6 p-3 text-sm sm:text-base bg-slate-50 border border-slate-200 rounded-lg text-slate-400 italic" />
+              <div className="flex gap-3">
+                <button onClick={() => setShowSubjectModal(false)} className="flex-1 py-2.5 sm:py-3 font-bold text-slate-500 text-sm sm:text-base">Cancel</button>
+                <button onClick={handleAddSubject} disabled={isSubmitting} className="flex-1 py-2.5 sm:py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold rounded-lg text-sm sm:text-base">{isSubmitting ? '...' : 'Add'}</button>
+              </div>
+           </div>
         </div>
       )}
     </div>

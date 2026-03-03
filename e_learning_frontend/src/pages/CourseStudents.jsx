@@ -137,7 +137,6 @@ export default function CourseStudents() {
                       <div>
                         <Link to={`/profile/${student.username}`} className="text-lg font-bold text-slate-900 hover:text-indigo-600 cursor-pointer flex items-center gap-2">
                           {student.username}
-                          {/* 🌟 The Smart Role Badge */}
                           <span className={`px-2 py-0.5 text-[10px] uppercase font-black rounded-sm ${
                             student.role === 'teacher' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
                           }`}>

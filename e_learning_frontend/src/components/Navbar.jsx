@@ -5,6 +5,7 @@ import api from '../api/axios';
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
+  
   // Authentication states
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -14,20 +15,19 @@ export default function Navbar() {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Logout Modal State
+  // Logout Modal & Mobile Menu States
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     // check token exists in local storage 
     const token = localStorage.getItem('access_token');
-    setIsLoggedIn(!!token); // convert to boolean and check if log in 
+    setIsLoggedIn(!!token); 
     
     if (token) {
-      // fetch user profile
       api.get('users/me/')
         .then(res => {
           setCurrentUser(res.data);
-          // only fetch notification if the user is not an dmin user type
           if (res.data.role !== 'admin') {
             fetchNotifications();
           }
@@ -38,25 +38,24 @@ export default function Navbar() {
           setIsLoggedIn(false);
         });
     } else {
-      // Clear user data if token not found
       setCurrentUser(null);
     }
-  }, [location.pathname]); // trigger when path changes
+    
+    // Close mobile menu automatically when navigating to a new page
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const handleDeleteNotification = async(e, notifId) => {
-    e.preventDefault()
-    e.stopPropagation()
-
+    e.preventDefault();
+    e.stopPropagation();
     try{
       await api.delete(`users/notifications/${notifId}/`);
       setNotifications(prev => prev.filter(n => n.id !== notifId));
-
     }catch(error){
       console.error("Failed to delete notification", error);
     }
   }
 
-  // Fetch notification 
   const fetchNotifications = async () => {
     try {
       const res = await api.get('users/notifications/');
@@ -67,7 +66,6 @@ export default function Navbar() {
     }
   };
   
-  // Mark a specific notification as read and navigate to its link
   const handleMarkAsRead = async (notifId, link) => {
     try {
       await api.post(`users/notifications/${notifId}/mark_read/`);
@@ -79,7 +77,6 @@ export default function Navbar() {
     }
   };
 
-  // Mark all notifications as read
   const handleMarkAllRead = async () => {
     try {
       await api.post('users/notifications/mark_all_read/');
@@ -89,10 +86,8 @@ export default function Navbar() {
     }
   };
 
-  // Click outside to close notification dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // if click is not inside the dropdown, close it
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
@@ -101,21 +96,71 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // handle user logout
   const handleLogout = () => {
-    // remove token
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    // reset UI 
     setIsLoggedIn(false);
     setCurrentUser(null);
     setShowLogoutModal(false);
-    // navigate to login page
     navigate('/login');
   };
 
-  // calculate the number of unread notifications
   const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const NotificationBell = () => (
+    <div className="relative flex items-center" ref={dropdownRef}>
+      <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 text-slate-500 hover:text-indigo-600 transition-colors relative cursor-pointer">
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+        {unreadCount > 0 && (
+          <span className="absolute top-1 right-1 flex items-center justify-center h-4 w-4 bg-rose-500 rounded-full text-[9px] font-bold text-white border-2 border-white">
+            {unreadCount}
+          </span>
+        )}
+      </button>
+
+      {showDropdown && (
+        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden transform opacity-100 scale-100 transition-all origin-top-right z-50">
+          <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+            <span className="font-bold text-slate-800 text-sm">Notifications</span>
+            {unreadCount > 0 && (
+              <button onClick={handleMarkAllRead} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer">Mark all as read</button>
+            )}
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-slate-500">You're all caught up!</div>
+            ) : (
+              <ul className="divide-y divide-slate-50">
+                {notifications.map((notif) => (
+                  <li 
+                    key={notif.id} 
+                    onClick={() => handleMarkAsRead(notif.id, notif.link)} 
+                    className={`group relative p-4 hover:bg-slate-50 cursor-pointer transition-colors ${!notif.is_read ? 'bg-indigo-50/30' : ''}`}
+                  >
+                    <div className="flex justify-between items-start mb-1 pr-8">
+                      <h4 className={`text-sm ${!notif.is_read ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>{notif.title}</h4>
+                      {!notif.is_read && <span className="h-2 w-2 bg-indigo-500 rounded-full mt-1.5"></span>}
+                    </div>
+                    <p className="text-xs text-slate-500 line-clamp-2">{notif.message}</p>
+                    <span className="text-[10px] text-slate-400 mt-2 block">{new Date(notif.created_at).toLocaleString()}</span>
+                    <button
+                      onClick={(e) => handleDeleteNotification(e, notif.id)}
+                      className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all cursor-pointer"
+                      title="Delete notification"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -123,101 +168,33 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             
-            {/* logo section */}
+            {/* Logo Section */}
             <div className="flex items-center">
               <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex-shrink-0 flex items-center gap-2">
-                <span className="text-2xl font-black text-indigo-600 tracking-tighter">E Learning Website</span>
+                <span className="text-xl sm:text-2xl font-black text-indigo-600 tracking-tighter truncate">E Learning Website</span>
               </Link>
             </div>
             
-            {/* Navigation Links based on role */}
-            <div className="flex items-center gap-6">
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-6">
               {isLoggedIn ? (
-                // if is admin
                 currentUser?.role === 'admin' ? (
                   <>
                     <Link to="/dashboard" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Admin Panel</Link>
-                    <button 
-                      onClick={() => setShowLogoutModal(true)} 
-                      className="ml-4 px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Logout
-                    </button>
+                    <button onClick={() => setShowLogoutModal(true)} className="ml-4 px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer">Logout</button>
                   </>
                 ) : (
-                  //if is student/ teacher
                   <>
                     <Link to="/" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Catalog</Link>
                     <Link to="/dashboard" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Dashboard</Link>
                     <Link to="/community" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Find People</Link>
                     <Link to="/inbox" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Inbox</Link>
                     <Link to="/profile" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Profile</Link>
-                    
-                    {/* Notification Bell */}
-                    <div className="relative" ref={dropdownRef}>
-                      <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 text-slate-500 hover:text-indigo-600 transition-colors relative cursor-pointer">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                        {unreadCount > 0 && (
-                          <span className="absolute top-1 right-1 flex items-center justify-center h-4 w-4 bg-rose-500 rounded-full text-[9px] font-bold text-white border-2 border-white">
-                            {unreadCount}
-                          </span>
-                        )}
-                      </button>
-
-                      {/* Dropdown Menu */}
-                      {showDropdown && (
-                        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden transform opacity-100 scale-100 transition-all origin-top-right">
-                          <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                            <span className="font-bold text-slate-800 text-sm">Notifications</span>
-                            {unreadCount > 0 && (
-                              <button onClick={handleMarkAllRead} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer">Mark all as read</button>
-                            )}
-                          </div>
-                          <div className="max-h-80 overflow-y-auto">
-                            {notifications.length === 0 ? (
-                              <div className="px-4 py-6 text-center text-sm text-slate-500">You're all caught up!</div>
-                            ) : (
-                              <ul className="divide-y divide-slate-50">
-                                {notifications.map((notif) => (
-                                  <li 
-                                    key={notif.id} 
-                                    onClick={() => handleMarkAsRead(notif.id, notif.link)} 
-                                    className={`group relative p-4 hover:bg-slate-50 cursor-pointer transition-colors ${!notif.is_read ? 'bg-indigo-50/30' : ''}`}
-                                  >
-                                    <div className="flex justify-between items-start mb-1 pr-8">
-                                      <h4 className={`text-sm ${!notif.is_read ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>{notif.title}</h4>
-                                      {!notif.is_read && <span className="h-2 w-2 bg-indigo-500 rounded-full mt-1.5"></span>}
-                                    </div>
-                                    <p className="text-xs text-slate-500 line-clamp-2">{notif.message}</p>
-                                    <span className="text-[10px] text-slate-400 mt-2 block">{new Date(notif.created_at).toLocaleString()}</span>
-                                    <button
-                                      onClick={(e) => handleDeleteNotification(e, notif.id)}
-                                      className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all cursor-pointer"
-                                      title="Delete notification"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                      </svg>
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <button 
-                      onClick={() => setShowLogoutModal(true)} 
-                      className="ml-4 px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Logout
-                    </button>
+                    <NotificationBell />
+                    <button onClick={() => setShowLogoutModal(true)} className="ml-2 px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer">Logout</button>
                   </>
                 )
               ) : (
-                // guest view
                 <>
                   <Link to="/" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Catalog</Link>
                   <Link to="/login" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Log in</Link>
@@ -225,8 +202,55 @@ export default function Navbar() {
                 </>
               )}
             </div>
+
+            {/* Mobile Navigation Controls  */}
+            <div className="flex items-center gap-2 md:hidden">
+              {isLoggedIn && currentUser?.role !== 'admin' && <NotificationBell />}
+              
+              <button 
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 rounded-md text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {isMobileMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Mobile Dropdown Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-2 pb-4 space-y-1 shadow-lg">
+            {isLoggedIn ? (
+              currentUser?.role === 'admin' ? (
+                <>
+                  <Link to="/dashboard" className="block px-3 py-2 rounded-md text-base font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-50">Admin Panel</Link>
+                  <button onClick={() => setShowLogoutModal(true)} className="block w-full text-left px-3 py-2 rounded-md text-base font-bold text-rose-600 hover:bg-rose-50">Logout</button>
+                </>
+              ) : (
+                <>
+                  <Link to="/" className="block px-3 py-2 rounded-md text-base font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-50">Catalog</Link>
+                  <Link to="/dashboard" className="block px-3 py-2 rounded-md text-base font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-50">Dashboard</Link>
+                  <Link to="/community" className="block px-3 py-2 rounded-md text-base font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-50">Find People</Link>
+                  <Link to="/inbox" className="block px-3 py-2 rounded-md text-base font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-50">Inbox</Link>
+                  <Link to="/profile" className="block px-3 py-2 rounded-md text-base font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-50">Profile</Link>
+                  <button onClick={() => setShowLogoutModal(true)} className="block w-full text-left px-3 py-2 rounded-md text-base font-bold text-rose-600 hover:bg-rose-50 mt-2 border-t border-slate-100 pt-3">Logout</button>
+                </>
+              )
+            ) : (
+              <>
+                <Link to="/" className="block px-3 py-2 rounded-md text-base font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-50">Catalog</Link>
+                <Link to="/login" className="block px-3 py-2 rounded-md text-base font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-50">Log in</Link>
+                <Link to="/register" className="block mt-2 px-3 py-2 rounded-md text-base font-bold text-center text-white bg-indigo-600 hover:bg-indigo-700">Sign up</Link>
+              </>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Logout Modal */}
