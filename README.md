@@ -20,7 +20,7 @@
 ## Deployment Link
 * http://174.138.29.8:5173/
 
-## Test Accounts (Pre-configured)
+## Test Accounts
 * **Admin** -> username: `admin` | password: `admin12345`
 * **Teacher** -> username: `teacher_lim` | password: `ttt12345`
 * **Student** -> username: `student_lim` | password: `ttt123456`

@@ -13,7 +13,10 @@ export default function Navbar() {
   // Notification States
   const [notifications, setNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef(null);
+  
+  // assign desktop and mobile ref
+  const desktopRef = useRef(null);
+  const mobileRef = useRef(null);
 
   // Logout Modal & Mobile Menu States
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -86,11 +89,13 @@ export default function Navbar() {
     }
   };
 
+
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
+      if (desktopRef.current && desktopRef.current.contains(event.target)) return;
+      if (mobileRef.current && mobileRef.current.contains(event.target)) return;
+      
+      setShowDropdown(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -107,8 +112,8 @@ export default function Navbar() {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  const NotificationBell = () => (
-    <div className="relative flex items-center" ref={dropdownRef}>
+  const renderNotificationBell = (ref) => (
+    <div className="relative flex items-center" ref={ref}>
       <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 text-slate-500 hover:text-indigo-600 transition-colors relative cursor-pointer">
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
         {unreadCount > 0 && (
@@ -139,7 +144,7 @@ export default function Navbar() {
                   >
                     <div className="flex justify-between items-start mb-1 pr-8">
                       <h4 className={`text-sm ${!notif.is_read ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>{notif.title}</h4>
-                      {!notif.is_read && <span className="h-2 w-2 bg-indigo-500 rounded-full mt-1.5"></span>}
+                      {!notif.is_read && <span className="h-2 w-2 bg-indigo-500 rounded-full mt-1.5 flex-shrink-0"></span>}
                     </div>
                     <p className="text-xs text-slate-500 line-clamp-2">{notif.message}</p>
                     <span className="text-[10px] text-slate-400 mt-2 block">{new Date(notif.created_at).toLocaleString()}</span>
@@ -190,7 +195,7 @@ export default function Navbar() {
                     <Link to="/community" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Find People</Link>
                     <Link to="/inbox" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Inbox</Link>
                     <Link to="/profile" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Profile</Link>
-                    <NotificationBell />
+                    {renderNotificationBell(desktopRef)}
                     <button onClick={() => setShowLogoutModal(true)} className="ml-2 px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer">Logout</button>
                   </>
                 )
@@ -205,7 +210,7 @@ export default function Navbar() {
 
             {/* Mobile Navigation Controls  */}
             <div className="flex items-center gap-2 md:hidden">
-              {isLoggedIn && currentUser?.role !== 'admin' && <NotificationBell />}
+              {isLoggedIn && currentUser?.role !== 'admin' && renderNotificationBell(mobileRef)}
               
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -255,7 +260,7 @@ export default function Navbar() {
 
       {/* Logout Modal */}
       {showLogoutModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform transition-all">
             <div className="flex flex-col items-center text-center">
               <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center mb-4">
