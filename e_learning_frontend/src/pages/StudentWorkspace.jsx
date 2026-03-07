@@ -25,7 +25,8 @@ export default function StudentWorkspace() {
           const firstMod = response.data.modules[0];
           setExpandedModuleId(firstMod.id);
           if (firstMod.contents?.length > 0) {
-             setActiveContent(firstMod.contents.sort((a, b) => a.order - b.order)[0]);
+            const firstContent = firstMod.contents.sort((a, b) => a.order - b.order)[0];
+            setActiveContent({ ...firstContent, moduleId: firstMod.id });
           }
         }
       } catch (err) {
@@ -58,41 +59,64 @@ export default function StudentWorkspace() {
   }, [flatContents]);
 
   const handleCompleteAndContinue = async () => {
-    if (!activeContent) return;
+    if (!activeContent || isMarking) return;
+
     setIsMarking(true);
 
-    try {
-      if (!activeContent.is_completed) {
-        await api.post(`courses/content/${activeContent.id}/mark-complete/`);
+    const currentContent = activeContent;
+    const next = nextContent;
 
-        setCourse(prev => {
-          const newCourse = { ...prev };
-          newCourse.modules = newCourse.modules.map(mod => {
-            if (mod.id === activeContent.moduleId) {
-              return {
-                ...mod,
-                contents: mod.contents.map(c => 
-                  c.id === activeContent.id ? { ...c, is_completed: true } : c
-                )
-              };
-            }
-            return mod; 
-          });
-          return newCourse;
+    if(!currentContent.is_completed)
+    {
+      setCourse(prev=> {
+        const newCourse = { ...prev };
+        newCourse.modules = newCourse.modules.map(mod => {
+          if (mod.id === currentContent.moduleId) {
+            return {
+              ...mod,
+              contents: mod.contents.map(c => 
+                c.id === currentContent.id ? { ...c, is_completed: true } : c
+              )
+            };
+          }
+          return mod; 
         });
-      }
+        return newCourse;
+      });
+    }
 
-      if (nextContent) {
-        setActiveContent(nextContent);
-        setExpandedModuleId(nextContent.moduleId);
-      } else {
-        setTimeout(() => {
-          alert("Congratulations! You have completed the entire course!");
-        }, 300);
+    if (next) {
+      setActiveContent(next);
+      setExpandedModuleId(next.moduleId);
+    } else {
+      setTimeout(() => {
+        alert("Congratulations! You have completed the entire course!");
+      }, 300);
+    }
+
+
+    try {
+      if (!currentContent.is_completed) {
+        await api.post(`courses/content/${currentContent.id}/mark-complete/`);
       }
     } catch (err) {
       console.error("Failed to mark complete:", err);
-      alert("Failed to save progress. Please try again.");
+      setCourse(prev => {
+        const revertedCourse = { ...prev };
+        revertedCourse.modules = revertedCourse.modules.map(mod => {
+          if (mod.id === currentContent.moduleId) {
+            return {
+              ...mod,
+              contents: mod.contents.map(c => 
+                c.id === currentContent.id ? { ...c, is_completed: false } : c
+              )
+            };
+          }
+          return mod; 
+        });
+        return revertedCourse;
+      });
+      alert("Network error: Failed to save progress. The completion status has been reverted.");
     } finally {
       setIsMarking(false);
     }
